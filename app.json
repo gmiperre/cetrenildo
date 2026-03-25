@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Equipe Cetreina",
+    "slug": "equipe-cetreina",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.equipecetreina.app"
+    },
+    "android": {
+      "package": "com.equipecetreina.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "NOTIFICATIONS"
+      ]
+    },
+    "plugins": [
+      "expo-notifications"
+    ],
+    "extra": {
+      "firebase": {
+        "apiKey": "AIzaSyDUwmHXRMjx64MQPaIjW2oALiPJdgKfElI",
+        "authDomain": "equipe-cetreina.firebaseapp.com",
+        "projectId": "equipe-cetreina",
+        "messagingSenderId": "979712783428",
+        "appId": "1:979712783428:web:a05dc8c54ac0511d58b811"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

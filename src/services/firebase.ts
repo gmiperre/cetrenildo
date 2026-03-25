@@ -1,0 +1,32 @@
+import Constants from 'expo-constants';
+import { FirebaseApp, FirebaseOptions, getApp, getApps, initializeApp } from 'firebase/app';
+import { Auth, getAuth } from 'firebase/auth';
+import { Firestore, getFirestore } from 'firebase/firestore';
+
+type ExpoFirebaseConfig = FirebaseOptions & {
+  messagingSenderId?: string;
+};
+
+const fallbackConfig: ExpoFirebaseConfig = {
+  apiKey: 'YOUR_FIREBASE_API_KEY',
+  authDomain: 'YOUR_PROJECT.firebaseapp.com',
+  projectId: 'YOUR_PROJECT_ID',
+  messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
+  appId: 'YOUR_APP_ID',
+};
+
+const config = (Constants.expoConfig?.extra?.firebase ?? fallbackConfig) as ExpoFirebaseConfig;
+
+export const isFirebaseConfigured = !Object.values(config).some((value) => !value || `${value}`.startsWith('YOUR_'));
+
+const app: FirebaseApp = getApps().length > 0 ? getApp() : initializeApp(config);
+
+export const firebaseApp = app;
+export const auth: Auth = getAuth(app);
+export const db: Firestore = getFirestore(app);
+
+export const ensureFirebaseConfigured = () => {
+  if (!isFirebaseConfigured) {
+    throw new Error('Configure o Firebase no app.json antes de autenticar ou sincronizar dados.');
+  }
+};

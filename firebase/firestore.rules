@@ -1,0 +1,122 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function userDocPath(userId) {
+      return /databases/$(database)/documents/users/$(userId);
+    }
+
+    function currentUser() {
+      return get(userDocPath(request.auth.uid)).data;
+    }
+
+    function isManager() {
+      return isAuthenticated()
+        && exists(userDocPath(request.auth.uid))
+        && currentUser().tipo == 'gestor';
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function userProfileEditableByOwner() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'nome',
+        'horarioEntradaEsperado',
+        'horarioSaidaEsperado',
+        'pushToken'
+      ]);
+    }
+
+    function ownerCanCreateOwnUserProfile(userId) {
+      return isOwner(userId)
+        && request.resource.data.id == userId
+        && request.resource.data.tipo == 'padrao'
+        && request.resource.data.email == request.auth.token.email;
+    }
+
+    function ownerCanUpdateOwnUserProfile(userId) {
+      return isOwner(userId)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.tipo == resource.data.tipo
+        && userProfileEditableByOwner();
+    }
+
+    function ownerEditableRegistroFields() {
+      return [
+        'justificativaTexto',
+        'justificativaCanal',
+        'justificativaStatus',
+        'justificativaEmailEnviado',
+        'justificativaEmailEm',
+        'justificativaEmailAssunto',
+        'justificativaEmailProtocolo',
+        'assinaturaUsuario',
+        'editadoPor',
+        'editadoEm'
+      ];
+    }
+
+    function ownerCanOnlyUpdateOwnJustification() {
+      return isOwner(resource.data.userId)
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.data == resource.data.data
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.horaEntrada == resource.data.horaEntrada
+        && request.resource.data.horaSaida == resource.data.horaSaida
+        && request.resource.data.criadoEm == resource.data.criadoEm
+        && request.resource.data.assinaturaUsuario.confirmado in [true, false]
+        && request.resource.data.assinaturaUsuario.userId in [null, request.auth.uid]
+        && request.resource.data.assinaturaGestor == resource.data.assinaturaGestor
+        && request.resource.data.justificativaObservacaoGestor == resource.data.justificativaObservacaoGestor
+        && request.resource.data.justificativaValidadaPor == resource.data.justificativaValidadaPor
+        && request.resource.data.justificativaValidadaEm == resource.data.justificativaValidadaEm
+        && request.resource.data.editadoPor == request.auth.uid
+        && request.resource.data.justificativaStatus != 'validada'
+        && request.resource.data.justificativaStatus != 'recusada'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(ownerEditableRegistroFields());
+    }
+
+    function ownerCanCreateOwnRegistro() {
+      return isOwner(request.resource.data.userId)
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.assinaturaGestor.confirmado == false
+        && request.resource.data.assinaturaGestor.userId == null
+        && request.resource.data.assinaturaGestor.timestamp == null
+        && request.resource.data.justificativaValidadaPor == null
+        && request.resource.data.justificativaValidadaEm == null;
+    }
+
+    function validLogAction() {
+      return request.resource.data.acao in ['create', 'update', 'approve'];
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isManager();
+      allow create: if isManager() || ownerCanCreateOwnUserProfile(userId);
+      allow update: if isManager() || ownerCanUpdateOwnUserProfile(userId);
+    }
+
+    match /registrosFrequencia/{registroId} {
+      allow read: if isOwner(resource.data.userId) || isManager();
+      allow create: if isManager() || ownerCanCreateOwnRegistro();
+      allow update: if isManager() || ownerCanOnlyUpdateOwnJustification();
+    }
+
+    match /logsAlteracao/{logId} {
+      allow read: if isManager();
+      allow create: if isAuthenticated()
+        && validLogAction()
+        && (
+          (isManager() && request.resource.data.userId is string)
+          || request.resource.data.userId == request.auth.uid
+        );
+    }
+  }
+}
