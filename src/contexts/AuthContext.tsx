@@ -29,28 +29,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadRequestRef = useRef(0);
 
   const loadProfile = useCallback(async (user: User | null, requestId?: number) => {
+    console.log('🔵 loadProfile chamado - requestId:', requestId, 'user:', user?.email);
+    
     if (!user) {
+      console.log('⚠️ loadProfile: usuário null');
       if (mountedRef.current) {
         setProfile(null);
       }
       return;
     }
 
-    const nextProfile = await userService.ensureUserProfile(user);
-    if (!mountedRef.current || (requestId !== undefined && requestId !== loadRequestRef.current)) {
-      return;
-    }
-
-    setProfile(nextProfile);
-
     try {
-      const pushToken = await notificationService.registerForPushNotifications();
-      if (pushToken) {
-        await userService.updatePushToken(user.uid, pushToken);
+      console.log('⏳ Carregando perfil do usuário:', user.email);
+      const nextProfile = await userService.ensureUserProfile(user);
+      console.log('✅ Perfil carregado:', nextProfile?.nome);
+
+      if (!mountedRef.current) {
+        console.log('❌ Componente desmontou durante loadProfile');
+        return;
       }
-      await notificationService.schedulePunchReminder(nextProfile.horarioEntradaEsperado);
+
+      if (requestId !== undefined && requestId !== loadRequestRef.current) {
+        console.log('⚠️ Race condition detectada - requestId:', requestId, 'vs loadRequestRef:', loadRequestRef.current);
+        return;
+      }
+
+      setProfile(nextProfile);
+
+      try {
+        console.log('📲 Registrando notificações...');
+        const pushToken = await notificationService.registerForPushNotifications();
+        if (pushToken) {
+          await userService.updatePushToken(user.uid, pushToken);
+          console.log('✅ Push token atualizado');
+        }
+        await notificationService.schedulePunchReminder(nextProfile.horarioEntradaEsperado);
+        console.log('✅ Notificações configuradas');
+      } catch (error) {
+        console.warn('Falha ao configurar notificações do usuário autenticado.', error);
+      }
     } catch (error) {
-      console.warn('Falha ao configurar notificações do usuário autenticado.', error);
+      console.error('❌ Erro em loadProfile:', error);
+      throw error;
     }
   }, []);
 
@@ -60,28 +80,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    console.log('🟢 AuthProvider montado - iniciando Firebase listener');
     mountedRef.current = true;
 
     const unsubscribe = authService.subscribe((user) => {
+      console.log('🎯 Firebase listener executado - user:', user?.email || 'null');
+      
       const requestId = loadRequestRef.current + 1;
       loadRequestRef.current = requestId;
+      console.log('📍 Request ID criado:', requestId);
+      
       setFirebaseUser(user);
 
       if (!user) {
+        console.log('🚪 Usuário logout detectado');
         setProfile(null);
         setLoading(false);
         return;
       }
 
+      console.log('🔓 Usuário login detectado:', user.email);
       setLoading(true);
+      console.log('⏳ Loading=true');
 
       loadProfile(user, requestId)
         .catch((error) => {
-          console.warn('Falha ao carregar perfil autenticado.', error);
+          console.error('❌ Erro ao carregar perfil após login:', error);
         })
         .finally(() => {
+          console.log('🔚 Finally - mountedRef:', mountedRef.current, 'requestId:', requestId, 'loadRequestRef:', loadRequestRef.current);
           if (mountedRef.current && requestId === loadRequestRef.current) {
+            console.log('✅ setLoading(false)');
             setLoading(false);
+          } else {
+            console.log('⚠️ Condição bloqueou setLoading(false)');
           }
         });
     });
@@ -95,6 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
+      console.log('🟡 AuthProvider desmontando');
       mountedRef.current = false;
       unsubscribe();
       unsubscribeNetInfo();

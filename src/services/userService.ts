@@ -21,17 +21,28 @@ const buildDefaultUserProfile = (user: User): UserProfile => ({
 
 export const userService = {
   async ensureUserProfile(user: User) {
+    console.log('📋 ensureUserProfile chamado para:', user.email);
     ensureFirebaseConfigured();
-    const ref = doc(usersCollection, user.uid);
-    const snapshot = await getDoc(ref);
+    try {
+      const ref = doc(usersCollection, user.uid);
+      console.log('🔍 Consultando Firestore - documento:', user.uid);
+      const snapshot = await getDoc(ref);
 
-    if (!snapshot.exists()) {
-      const profile = buildDefaultUserProfile(user);
-      await setDoc(ref, profile);
-      return profile;
+      if (!snapshot.exists()) {
+        console.log('📝 Perfil não existe - criando novo perfil padrão');
+        const profile = buildDefaultUserProfile(user);
+        console.log('💾 Salvando novo perfil:', profile);
+        await setDoc(ref, profile);
+        console.log('✅ Perfil criado com sucesso');
+        return profile;
+      }
+
+      console.log('✅ Perfil carregado do Firestore');
+      return snapshot.data() as UserProfile;
+    } catch (error) {
+      console.error('❌ Erro em ensureUserProfile:', error);
+      throw error;
     }
-
-    return snapshot.data() as UserProfile;
   },
 
   async getById(userId: string) {
