@@ -1,7 +1,7 @@
-import { useCallback, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
-import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import { useCallback } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { AppButton } from '../../components/AppButton';
 import { ScreenShell } from '../../components/ScreenShell';
@@ -9,18 +9,15 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { SummaryCard } from '../../components/SummaryCard';
 import { useAuth } from '../../hooks/useAuth';
 import { useMonthlySummary } from '../../hooks/useMonthlySummary';
-import { frequenciaService } from '../../services/frequenciaService';
-import { getErrorMessage } from '../../utils/errors';
 import { formatTime, getTodayKey } from '../../utils/date';
 import { theme } from '../../utils/theme';
-import { AppTabParamList } from '../../navigation/types';
+import { AppStackParamList } from '../../navigation/types';
 
-type Props = BottomTabScreenProps<AppTabParamList, 'HomeTab'>;
+type Props = NativeStackScreenProps<AppStackParamList, 'Home'>;
 
 export function HomeScreen({ navigation }: Props) {
   const { logout, profile } = useAuth();
   const { records, workedDays, missedDays, refresh } = useMonthlySummary(profile?.id);
-  const [punchLoading, setPunchLoading] = useState(false);
   const pendingEmailCount = records.filter((record) => record.justificativaStatus === 'pendente_envio').length;
   const rejectedCount = records.filter((record) => record.justificativaStatus === 'recusada').length;
 
@@ -37,28 +34,12 @@ export function HomeScreen({ navigation }: Props) {
     }, [refresh]),
   );
 
-  const handlePunch = async () => {
-    if (!profile) {
-      return;
-    }
-
-    try {
-      setPunchLoading(true);
-      await frequenciaService.registerPunch(profile);
-      await refresh();
-    } catch (error) {
-      Alert.alert('Falha ao bater ponto', getErrorMessage(error, 'Tente novamente.'));
-    } finally {
-      setPunchLoading(false);
-    }
-  };
-
   if (!profile) {
     return null;
   }
 
   return (
-    <ScreenShell>
+    <ScreenShell showNav>
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <Text style={styles.greeting}>Olá, {profile.nome}</Text>
@@ -70,7 +51,7 @@ export function HomeScreen({ navigation }: Props) {
       <View style={styles.heroCard}>
         {punchState === 'complete' || punchState === 'pending' ? (
           <>
-            <Text style={styles.heroBadge}>✓ Frequência registrada</Text>
+            <Text style={styles.heroBadge}>✓ Resumo do dia</Text>
             <View style={styles.heroTimesRow}>
               <View style={styles.heroTimeBlock}>
                 <Text style={styles.heroTimeLabel}>Entrada</Text>
@@ -82,13 +63,14 @@ export function HomeScreen({ navigation }: Props) {
                 <Text style={styles.heroTimeValue}>{formatTime(todayRecord?.horaSaida)}</Text>
               </View>
             </View>
-            <Text style={styles.heroText}>Tudo certo por hoje. Retorne amanhã para registrar o próximo dia.</Text>
+            <Text style={styles.heroText}>Acompanhe seus registros e os demais fluxos pelo catálogo de módulos.</Text>
+            <AppButton onPress={() => navigation.navigate('Modulos')} title="Abrir módulos" variant="secondary" />
           </>
         ) : (
           <>
-            <Text style={styles.heroTitle}>Módulo de frequência</Text>
-            <Text style={styles.heroText}>Bata o ponto para registrar sua presença de hoje com o horário esperado do seu perfil.</Text>
-            <AppButton loading={punchLoading} onPress={handlePunch} title="Bater ponto" />
+            <Text style={styles.heroTitle}>Área inicial</Text>
+            <Text style={styles.heroText}>Acesse os módulos para registrar sua frequência, acompanhar históricos e usar os próximos recursos do app.</Text>
+            <AppButton onPress={() => navigation.navigate('Modulos')} title="Abrir módulos" />
           </>
         )}
       </View>
@@ -112,8 +94,6 @@ export function HomeScreen({ navigation }: Props) {
         <Text style={styles.sectionText}>• Gestores podem validar registros e justificar ausências diretamente no módulo.</Text>
       </View>
 
-      <AppButton onPress={() => navigation.navigate('FrequenciaTab')} title="Abrir módulo de frequência" variant="secondary" />
-      <AppButton onPress={() => logout()} title="Sair" variant="ghost" />
     </ScreenShell>
   );
 }

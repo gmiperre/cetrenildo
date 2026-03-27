@@ -2,7 +2,7 @@ import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 
 import { useAuth } from '../hooks/useAuth';
 import { theme } from '../utils/theme';
-import { AppTabs } from './AppTabs';
+import { AppNavigator } from './AppNavigator';
 import { AuthNavigator } from './AuthNavigator';
 
 const navigationTheme = {
@@ -20,5 +20,5 @@ const navigationTheme = {
 export function RootNavigator() {
   const { firebaseUser } = useAuth();
 
-  return <NavigationContainer theme={navigationTheme}>{firebaseUser ? <AppTabs /> : <AuthNavigator />}</NavigationContainer>;
+  return <NavigationContainer theme={navigationTheme}>{firebaseUser ? <AppNavigator /> : <AuthNavigator />}</NavigationContainer>;
 }

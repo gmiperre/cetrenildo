@@ -67,7 +67,7 @@ export function LoginScreen() {
   };
 
   return (
-    <ScreenShell>
+    <ScreenShell showNav={false}>
       <View style={styles.hero}>
         <Text style={styles.eyebrow}>Equipe Cetreina</Text>
         <Text style={styles.title}>Controle de frequência para RH administrativo</Text>

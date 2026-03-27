@@ -1,6 +1,6 @@
 # Equipe Cetreina
 
-Aplicativo mobile em React Native com Expo e backend Firebase para apoiar rotinas de RH, com foco inicial em controle de frequência e estrutura pronta para expansão modular.
+Aplicativo mobile em React Native com Expo e backend Firebase para apoiar rotinas de RH, com foco inicial em controle de frequência e estrutura pronta para expansao modular.
 
 Documentacao complementar:
 
@@ -16,6 +16,11 @@ Status atual:
 
 Atualizacoes recentes:
 
+- Navegacao reorganizada para o fluxo `login > home > modulos > frequencia`
+- Tela `Modulos` adicionada como catalogo para expansao de dominios como Frequencia e Ferias
+- Placeholder inicial do modulo de Ferias adicionado para guiar a proxima etapa da evolucao
+- Cadastro de funcionario direto pela Home do gestor, com e-mail, senha inicial e carga horaria esperada
+- Rollback automatico do usuario no Authentication se a gravacao do perfil falhar
 - Correcao de permissao para usuario `padrao` registrar e atualizar ponto (entrada/saida)
 - Registro retroativo habilitado no detalhe do dia para datas passadas
 - Um unico toque registra entrada e saida simultaneamente usando o horario esperado do perfil
@@ -29,9 +34,9 @@ Atualizacoes recentes:
 - Expo + React Native
 - TypeScript
 - Firebase Authentication e Firestore
-- React Navigation com Stack + Bottom Tabs
-- Context API para sessão e perfil
-- Sincronização offline básica com AsyncStorage
+- React Navigation com Stack modular
+- Context API para sessao e perfil
+- Sincronizacao offline basica com AsyncStorage
 - React DOM + React Native Web para execucao no navegador
 
 ## Estrutura
@@ -53,20 +58,45 @@ firebase/
 
 - Login com e-mail e senha
 - Recuperacao de senha por e-mail
-- Persistência de sessão via Firebase Auth
-- Home com resumo mensal, avisos e botão único de ponto
-- Fluxo de frequência com registro diário, histórico e validação
-- Registro retroativo de presenca com horario esperado (quando aplicavel)
+- Persistencia de sessao via Firebase Auth
+- Home como painel inicial do usuario autenticado
+- Catalogo de modulos com entrada para Frequencia e visao inicial de Ferias
+- Home do gestor com cadastro de funcionario, senha inicial e carga horaria esperada
+- Fluxo de frequencia com registro diario, historico e validacao
+- Registro retroativo de presenca com horario esperado quando aplicavel
 - Justificativa por e-mail com rastreio no app
 - Controle de acesso no frontend e nas regras do Firestore
-- Registro de eventos de alteração para criação, edição e validação
-- Fila offline básica para criação e atualização de registros
-- Calendario de dias especiais via Firestore (`calendarDays`) com suporte a feriados, ponto facultativo e sem expediente
-- Bloqueio de ponto e sinalização visual para dias marcados como dispensados
+- Registro de eventos de alteracao para criacao, edicao e validacao
+- Fila offline basica para criacao e atualizacao de registros
+- Calendario de dias especiais via Firestore `calendarDays` com suporte a feriados, ponto facultativo e sem expediente
+- Bloqueio de ponto e sinalizacao visual para dias marcados como dispensados
+
+## Fluxo de navegacao autenticada
+
+Fluxo atual do app apos login:
+
+1. `Login`
+2. `Home`
+3. `Modulos`
+4. `Frequencia` ou `Ferias`
+
+Como isso foi organizado:
+
+- A `Home` agora funciona como painel inicial e nao mais como entrada direta do modulo de Frequencia.
+- A tela `Modulos` concentra os acessos aos dominios funcionais do app.
+- `Frequencia` permanece como stack proprio, com telas de resumo, registro do dia e historico.
+- `Ferias` entrou como placeholder navegavel para preparar a futura implementacao do modulo.
+
+Beneficios da estrutura atual:
+
+- separa melhor o painel inicial das rotinas operacionais
+- reduz acoplamento da Home com o modulo de Frequencia
+- prepara o projeto para novos dominios sem transformar cada recurso em aba principal
+- facilita a evolucao futura do modulo de Ferias
 
 ## Configuração Firebase
 
-O arquivo `app.json` atualmente já está configurado para o projeto Firebase `equipe-cetreina`.
+O arquivo `app.json` atualmente ja esta configurado para o projeto Firebase `equipe-cetreina`.
 
 Se voce for usar outro projeto Firebase, altere os campos em `expo.extra.firebase`:
 
@@ -96,7 +126,7 @@ Onde os dados ficam registrados:
 
 - O Firebase Authentication controla as credenciais e a sessao do usuario.
 - O app cria ou garante o documento do usuario na colecao `users` no primeiro login, via `src/services/userService.ts`.
-- O projeto nao mantem, neste momento, uma colecao dedicada de historico de acessos/login/logout.
+- O projeto nao mantem, neste momento, uma colecao dedicada de historico de acessos ou login/logout.
 
 Recuperacao de senha:
 
@@ -107,6 +137,55 @@ Observacao sobre cadastro:
 
 - O projeto nao expoe `Cadastre-se` publicamente na interface.
 - Para um contexto corporativo de RH, a recomendacao atual e manter a criacao de usuarios como processo controlado, evitando auto-cadastro publico sem regras adicionais.
+- Gestores autenticados podem cadastrar funcionarios diretamente pela Home, informando nome, e-mail, senha inicial e horario esperado.
+- O cadastro pelo app cria o usuario no Firebase Authentication e grava o perfil correspondente na colecao `users` do Firestore.
+- Se a criacao no Authentication ocorrer mas a gravacao do perfil falhar, o app remove o usuario recem-criado para evitar cadastro incompleto.
+
+## Cadastro de funcionario pelo gestor
+
+Fluxo disponivel no app:
+
+1. Entre no app com um usuario cujo campo `tipo` seja `gestor` na colecao `users`.
+2. Abra a Home.
+3. Toque para abrir o fluxo autenticado e use a propria Home para preencher o bloco `Cadastrar funcionario`.
+4. Informe `Nome`, `E-mail`, `Senha inicial`, `Entrada` e `Saida`.
+5. Toque em `Criar funcionario`.
+6. O app cria o acesso no Firebase Authentication.
+7. Em seguida, grava o perfil na colecao `users` com o mesmo `uid` criado no Auth.
+
+Comportamento atual:
+
+- O novo usuario e criado com `tipo: 'padrao'`.
+- A carga horaria inicial fica salva nos campos `horarioEntradaEsperado` e `horarioSaidaEsperado`.
+- O gestor permanece autenticado durante o processo; a sessao atual nao e trocada pelo novo funcionario.
+- Em caso de falha depois da criacao no Auth, o usuario novo e removido automaticamente.
+
+Estrutura do perfil criado:
+
+```json
+{
+  "id": "UID_DO_FIREBASE_AUTH",
+  "nome": "Nome do Funcionario",
+  "email": "funcionario@empresa.com",
+  "tipo": "padrao",
+  "horarioEntradaEsperado": "08:00",
+  "horarioSaidaEsperado": "17:00",
+  "pushToken": null
+}
+```
+
+Validacoes aplicadas pelo formulario:
+
+- `Nome` obrigatorio
+- `E-mail` obrigatorio
+- `Senha inicial` obrigatoria com minimo de 6 caracteres
+- `Entrada` e `Saida` obrigatorias no formato `HH:MM`
+
+Limitacoes atuais:
+
+- O cadastro cria apenas usuarios do tipo `padrao`.
+- Ainda nao existe tela para editar a carga horaria depois do cadastro.
+- Ainda nao existe tela para redefinir senha de funcionarios cadastrados pelo gestor.
 
 ## Regras e índices
 
@@ -165,6 +244,7 @@ cd <nome-da-pasta-do-projeto>
 
 ```bash
 npm install
+npm.cmd install
 ```
 
 4. Configurar Firebase
@@ -194,6 +274,7 @@ npm run test
 
 ```bash
 npm run start
+npx expo start
 ```
 
 Atalhos por plataforma:
@@ -214,6 +295,9 @@ npx firebase-tools deploy --only firestore:rules,firestore:indexes --project <se
 9. Validacao funcional minima
 
 - Entrar com usuario colaborador.
+- Entrar com usuario gestor e cadastrar um novo funcionario pela Home.
+- Confirmar no Firebase Authentication que o novo usuario foi criado.
+- Confirmar na colecao `users` que o perfil foi criado com os horarios informados.
 - Registrar ponto (um toque registra entrada e saida pelo horario esperado do perfil).
 - Abrir um dia passado no historico e registrar presenca retroativa.
 - Confirmar que a Home exibe confirmacao de frequencia registrada apos o ponto.
@@ -311,6 +395,7 @@ Permissoes:
 ## Observações
 
 - O app cria automaticamente o documento do usuário na coleção users no primeiro login autenticado.
+- Quando o cadastro e feito por gestor, esse documento ja e criado no momento do provisionamento, sem depender do primeiro login do funcionario.
 - O fluxo opcional de notificações usa expo-notifications como camada cliente. Para envio remoto real via FCM, configure as credenciais nativas do Firebase no projeto Expo/EAS.
 - O registro de eventos atual ajuda no rastreio operacional, mas nao deve ser tratado como trilha de auditoria forte de backend.
 - O resumo mensal considera dias úteis como base para apuração simples de faltas, respeitando `calendarDays` quando disponivel.

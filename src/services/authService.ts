@@ -1,6 +1,6 @@
-import { User, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { User, createUserWithEmailAndPassword, deleteUser, getAuth, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 
-import { auth, ensureFirebaseConfigured } from './firebase';
+import { auth, ensureFirebaseConfigured, getSecondaryAuthApp } from './firebase';
 
 export const authService = {
   async login(email: string, password: string) {
@@ -19,6 +19,29 @@ export const authService = {
   async resetPassword(email: string) {
     ensureFirebaseConfigured();
     return sendPasswordResetEmail(auth, email.trim());
+  },
+
+  async createEmployee(email: string, password: string, afterCreate?: (user: User) => Promise<void>) {
+    ensureFirebaseConfigured();
+    const authApp = getSecondaryAuthApp();
+    const secondaryAuth = getAuth(authApp);
+
+    try {
+      const result = await createUserWithEmailAndPassword(secondaryAuth, email.trim(), password);
+
+      if (afterCreate) {
+        try {
+          await afterCreate(result.user);
+        } catch (error) {
+          await deleteUser(result.user).catch(() => undefined);
+          throw error;
+        }
+      }
+
+      return result.user;
+    } finally {
+      await signOut(secondaryAuth).catch(() => undefined);
+    }
   },
 
   async logout() {

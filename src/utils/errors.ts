@@ -8,7 +8,9 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   'auth/user-not-found': 'E-mail ou senha incorretos. Verifique os dados e tente novamente.',
   'auth/wrong-password': 'E-mail ou senha incorretos. Verifique os dados e tente novamente.',
   'auth/invalid-email': 'Informe um e-mail valido.',
+  'auth/email-already-in-use': 'Este e-mail ja esta vinculado a outro usuario.',
   'auth/missing-password': 'Informe sua senha para continuar.',
+  'auth/weak-password': 'A senha precisa ter pelo menos 6 caracteres.',
   'auth/too-many-requests': 'Muitas tentativas de login. Aguarde alguns minutos e tente novamente.',
   'auth/network-request-failed': 'Falha de conexao. Verifique sua internet e tente novamente.',
 };

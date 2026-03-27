@@ -1,27 +1,27 @@
 import { Pressable, Text } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import { FrequenciaScreen } from '../screens/frequencia/FrequenciaScreen';
-import { HistoricoScreen } from '../screens/frequencia/HistoricoScreen';
-import { RegistroScreen } from '../screens/frequencia/RegistroScreen';
+import { CadastroFuncionarioScreen } from '../screens/equipe/CadastroFuncionarioScreen';
+import { EquipeScreen } from '../screens/equipe/EquipeScreen';
 import { theme } from '../utils/theme';
-import { FrequenciaStackParamList } from './types';
+import { EquipeStackParamList } from './types';
 
-const Stack = createNativeStackNavigator<FrequenciaStackParamList>();
+const Stack = createNativeStackNavigator<EquipeStackParamList>();
 
-export function FrequenciaNavigator() {
+export function EquipeNavigator() {
   return (
     <Stack.Navigator
       screenOptions={{
         headerStyle: { backgroundColor: theme.colors.surface },
         headerTitleStyle: { color: theme.colors.text, fontWeight: '700' },
+        contentStyle: { backgroundColor: theme.colors.background },
       }}
     >
       <Stack.Screen
-        component={FrequenciaScreen}
-        name="FrequenciaHome"
+        component={EquipeScreen}
+        name="EquipeHome"
         options={({ navigation }) => ({
-          title: 'Frequência',
+          title: 'Equipe',
           headerLeft: () => (
             <Pressable onPress={() => navigation.getParent()?.goBack()} style={{ paddingVertical: 4, paddingRight: 12 }}>
               <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Módulos</Text>
@@ -29,8 +29,11 @@ export function FrequenciaNavigator() {
           ),
         })}
       />
-      <Stack.Screen component={RegistroScreen} name="Registro" options={{ title: 'Registro do dia' }} />
-      <Stack.Screen component={HistoricoScreen} name="Historico" options={{ title: 'Histórico' }} />
+      <Stack.Screen
+        component={CadastroFuncionarioScreen}
+        name="CadastroFuncionario"
+        options={{ title: 'Cadastrar Funcionário' }}
+      />
     </Stack.Navigator>
   );
 }

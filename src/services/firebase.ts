@@ -20,10 +20,16 @@ const config = (Constants.expoConfig?.extra?.firebase ?? fallbackConfig) as Expo
 export const isFirebaseConfigured = !Object.values(config).some((value) => !value || `${value}`.startsWith('YOUR_'));
 
 const app: FirebaseApp = getApps().length > 0 ? getApp() : initializeApp(config);
+const secondaryAuthAppName = 'employee-provisioning';
 
 export const firebaseApp = app;
 export const auth: Auth = getAuth(app);
 export const db: Firestore = getFirestore(app);
+
+export const getSecondaryAuthApp = () => {
+  const existingApp = getApps().find((item) => item.name === secondaryAuthAppName);
+  return existingApp ?? initializeApp(config, secondaryAuthAppName);
+};
 
 export const ensureFirebaseConfigured = () => {
   if (!isFirebaseConfigured) {

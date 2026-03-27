@@ -1,7 +1,7 @@
 import { User } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, orderBy, query, setDoc } from 'firebase/firestore';
 
-import { UserProfile } from '../models/user';
+import { UserProfile, UserRole } from '../models/user';
 import { db, ensureFirebaseConfigured } from './firebase';
 
 const usersCollection = collection(db, 'users');
@@ -62,6 +62,31 @@ export const userService = {
     const users = snapshot.docs.map((item) => item.data() as UserProfile);
     teamCache = { users, cachedAt: Date.now() };
     return users;
+  },
+
+  async createManagedProfile(input: {
+    id: string;
+    nome: string;
+    email: string;
+    tipo?: UserRole;
+    horarioEntradaEsperado: string;
+    horarioSaidaEsperado: string;
+  }) {
+    ensureFirebaseConfigured();
+
+    const profile: UserProfile = {
+      id: input.id,
+      nome: input.nome.trim(),
+      email: input.email.trim(),
+      tipo: input.tipo ?? 'padrao',
+      horarioEntradaEsperado: input.horarioEntradaEsperado,
+      horarioSaidaEsperado: input.horarioSaidaEsperado,
+      pushToken: null,
+    };
+
+    await setDoc(doc(usersCollection, input.id), profile);
+    teamCache = null;
+    return profile;
   },
 
   async updatePushToken(userId: string, pushToken: string | null) {

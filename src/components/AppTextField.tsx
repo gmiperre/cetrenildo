@@ -1,4 +1,4 @@
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardTypeOptions, StyleSheet, Text, TextInput, TextInputAutoCapitalize, View } from 'react-native';
 
 import { theme } from '../utils/theme';
 
@@ -9,13 +9,32 @@ interface AppTextFieldProps {
   secureTextEntry?: boolean;
   multiline?: boolean;
   placeholder?: string;
+  keyboardType?: KeyboardTypeOptions;
+  autoCapitalize?: TextInputAutoCapitalize;
+  autoCorrect?: boolean;
+  maxLength?: number;
 }
 
-export function AppTextField({ label, value, onChangeText, secureTextEntry = false, multiline = false, placeholder }: AppTextFieldProps) {
+export function AppTextField({
+  label,
+  value,
+  onChangeText,
+  secureTextEntry = false,
+  multiline = false,
+  placeholder,
+  keyboardType,
+  autoCapitalize = 'sentences',
+  autoCorrect = false,
+  maxLength,
+}: AppTextFieldProps) {
   return (
     <View style={styles.wrapper}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
+        autoCapitalize={autoCapitalize}
+        autoCorrect={autoCorrect}
+        keyboardType={keyboardType}
+        maxLength={maxLength}
         multiline={multiline}
         onChangeText={onChangeText}
         placeholder={placeholder}
