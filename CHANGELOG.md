@@ -16,6 +16,7 @@ Este changelog segue uma estrutura inspirada em Keep a Changelog.
 - Utilitario `src/utils/errors.ts` para padronizar mensagens de erro na interface.
 - Cache simples em memoria para a listagem de equipe em `src/services/userService.ts`.
 - Documento `firebase.json` para deploy de regras e indices do Firestore.
+- Acao de registro retroativo no detalhe do dia (`RegistroScreen`) para permitir marcar presenca em datas passadas.
 
 ### Changed
 
@@ -27,6 +28,9 @@ Este changelog segue uma estrutura inspirada em Keep a Changelog.
 - `frequenciaService` foi refatorado para compartilhar regras de justificativa com o modulo de dominio.
 - `AuthContext` passou a tratar melhor erros de carregamento de perfil e sincronizacao.
 - Tratamento de erro nas telas foi padronizado com utilitario unico.
+- `frequenciaService.registerPunch` passou a aceitar data alvo e aplicar horario esperado do perfil em registros retroativos.
+- Payload offline de `registerPunch` passou a suportar data opcional para replay consistente de marcacoes retroativas.
+- `README.md` atualizado com as mudancas de ponto retroativo, permissao de usuario padrao e comando de deploy utilizado.
 
 ### Fixed
 
@@ -38,12 +42,15 @@ Este changelog segue uma estrutura inspirada em Keep a Changelog.
 - Correcao do replay da fila offline com payloads tipados e metadados de retry.
 - Correcao da duplicacao de labels e regras de status de justificativa entre telas e services.
 - Correcao da copy da tela de login para o fluxo atual sem anexos.
+- Correcao das regras para permitir que usuario `padrao` atualize seus proprios campos de ponto (entrada/saida/status) sem ampliar permissao para campos sensiveis.
+- Correcao do bloqueio de registro em dias passados, habilitando marcacao retroativa para casos de esquecimento de presenca.
 
 ### Security
 
 - Hardening de `firebase/firestore.rules` para restringir criacao e atualizacao de `users` e `registrosFrequencia`.
 - Regras do Firestore recompiladas e publicadas no projeto `equipe-cetreina`.
 - Vulnerabilidades reportadas pelo `npm audit` em `undici` foram eliminadas por meio da atualizacao do SDK Firebase.
+- Atualizacao de `firebase/firestore.rules` publicada com permissao especifica e restrita para update de ponto pelo proprio usuario autenticado.
 
 ## [1.0.0]
 

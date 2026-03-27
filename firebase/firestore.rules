@@ -63,6 +63,33 @@ service cloud.firestore {
       ];
     }
 
+    function ownerCanUpdateOwnPunch() {
+      return isOwner(resource.data.userId)
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.data == resource.data.data
+        && request.resource.data.criadoEm == resource.data.criadoEm
+        && request.resource.data.justificativaTexto == resource.data.justificativaTexto
+        && request.resource.data.justificativaCanal == resource.data.justificativaCanal
+        && request.resource.data.justificativaStatus == resource.data.justificativaStatus
+        && request.resource.data.justificativaEmailEnviado == resource.data.justificativaEmailEnviado
+        && request.resource.data.justificativaEmailEm == resource.data.justificativaEmailEm
+        && request.resource.data.justificativaEmailAssunto == resource.data.justificativaEmailAssunto
+        && request.resource.data.justificativaEmailProtocolo == resource.data.justificativaEmailProtocolo
+        && request.resource.data.justificativaObservacaoGestor == resource.data.justificativaObservacaoGestor
+        && request.resource.data.justificativaValidadaPor == resource.data.justificativaValidadaPor
+        && request.resource.data.justificativaValidadaEm == resource.data.justificativaValidadaEm
+        && request.resource.data.assinaturaUsuario == resource.data.assinaturaUsuario
+        && request.resource.data.assinaturaGestor == resource.data.assinaturaGestor
+        && request.resource.data.editadoPor == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'horaEntrada',
+          'horaSaida',
+          'status',
+          'editadoPor',
+          'editadoEm'
+        ]);
+    }
+
     function ownerCanOnlyUpdateOwnJustification() {
       return isOwner(resource.data.userId)
         && request.resource.data.userId == resource.data.userId
@@ -93,6 +120,11 @@ service cloud.firestore {
         && request.resource.data.justificativaValidadaEm == null;
     }
 
+    function ownerCanReadOwnRegistroById(registroId) {
+      return isAuthenticated()
+        && registroId.matches('^' + request.auth.uid + '_[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
     function validLogAction() {
       return request.resource.data.acao in ['create', 'update', 'approve'];
     }
@@ -104,9 +136,11 @@ service cloud.firestore {
     }
 
     match /registrosFrequencia/{registroId} {
-      allow read: if isOwner(resource.data.userId) || isManager();
+      allow read: if isManager()
+        || (resource != null && isOwner(resource.data.userId))
+        || (resource == null && ownerCanReadOwnRegistroById(registroId));
       allow create: if isManager() || ownerCanCreateOwnRegistro();
-      allow update: if isManager() || ownerCanOnlyUpdateOwnJustification();
+      allow update: if isManager() || ownerCanOnlyUpdateOwnJustification() || ownerCanUpdateOwnPunch();
     }
 
     match /logsAlteracao/{logId} {
@@ -117,6 +151,11 @@ service cloud.firestore {
           (isManager() && request.resource.data.userId is string)
           || request.resource.data.userId == request.auth.uid
         );
+    }
+
+    match /calendarDays/{dayId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isManager();
     }
   }
 }

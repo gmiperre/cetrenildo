@@ -14,13 +14,39 @@ export function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  const handleEmailChange = (value: string) => {
+    setEmail(value);
+    if (loginError) {
+      setLoginError(null);
+    }
+  };
+
+  const handlePasswordChange = (value: string) => {
+    setPassword(value);
+    if (loginError) {
+      setLoginError(null);
+    }
+  };
 
   const handleLogin = async () => {
+    if (!email.trim()) {
+      setLoginError('Informe seu e-mail para continuar.');
+      return;
+    }
+
+    if (!password.trim()) {
+      setLoginError('Informe sua senha para continuar.');
+      return;
+    }
+
     try {
       setLoading(true);
+      setLoginError(null);
       await login(email, password);
     } catch (error) {
-      Alert.alert('Falha no login', getErrorMessage(error, 'Não foi possível autenticar.'));
+      setLoginError(getErrorMessage(error, 'Não foi possível autenticar.'));
     } finally {
       setLoading(false);
     }
@@ -49,8 +75,9 @@ export function LoginScreen() {
       </View>
 
       <View style={styles.card}>
-        <AppTextField label="E-mail" onChangeText={setEmail} placeholder="voce@empresa.com" value={email} />
-        <AppTextField label="Senha" onChangeText={setPassword} secureTextEntry value={password} />
+        <AppTextField label="E-mail" onChangeText={handleEmailChange} placeholder="voce@empresa.com" value={email} />
+        <AppTextField label="Senha" onChangeText={handlePasswordChange} secureTextEntry value={password} />
+        {loginError ? <Text style={styles.loginErrorText}>{loginError}</Text> : null}
         <Pressable onPress={handleForgotPassword} style={styles.linkButton}>
           <Text style={styles.linkText}>Esqueceu a senha?</Text>
         </Pressable>
@@ -90,6 +117,12 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,
     ...theme.shadow,
+  },
+  loginErrorText: {
+    color: theme.colors.danger,
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: -4,
   },
   linkButton: {
     alignSelf: 'flex-start',

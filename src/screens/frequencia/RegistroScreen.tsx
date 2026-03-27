@@ -10,9 +10,11 @@ import { ScreenShell } from '../../components/ScreenShell';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useAuth } from '../../hooks/useAuth';
 import { getJustificativaStatusLabel } from '../../domain/frequencia';
+import { CalendarDay } from '../../models/calendar';
 import { FrequenciaRegistro } from '../../models/frequencia';
+import { calendarService } from '../../services/calendarService';
 import { frequenciaService } from '../../services/frequenciaService';
-import { formatDisplayDate, formatTime } from '../../utils/date';
+import { formatDisplayDate, formatTime, getTodayKey } from '../../utils/date';
 import { getErrorMessage } from '../../utils/errors';
 import { theme } from '../../utils/theme';
 import { FrequenciaStackParamList } from '../../navigation/types';
@@ -30,6 +32,10 @@ export function RegistroScreen({ route }: Props) {
   const [emailProtocolo, setEmailProtocolo] = useState('');
   const [observacaoGestor, setObservacaoGestor] = useState('');
   const [saving, setSaving] = useState(false);
+  const [registeringPunch, setRegisteringPunch] = useState(false);
+  const [dayPolicy, setDayPolicy] = useState<CalendarDay | null>(null);
+  const isOwnRecord = profile?.id === targetUserId;
+  const canRegisterPunchForDate = Boolean(isOwnRecord && date <= getTodayKey() && (dayPolicy?.requerPonto ?? true));
 
   const loadRecord = useCallback(async () => {
     if (!targetUserId) {
@@ -37,7 +43,9 @@ export function RegistroScreen({ route }: Props) {
     }
 
     const nextRecord = await frequenciaService.getRecordByDate(targetUserId, date);
+    const nextDayPolicy = await calendarService.getByDate(date);
     setRecord(nextRecord);
+    setDayPolicy(nextDayPolicy);
     setJustificativaTexto(nextRecord?.justificativaTexto ?? '');
     setEmailEnviado(nextRecord?.justificativaEmailEnviado ?? false);
     setEmailAssunto(nextRecord?.justificativaEmailAssunto ?? '');
@@ -133,6 +141,30 @@ export function RegistroScreen({ route }: Props) {
     }
   };
 
+  const handleRegisterPunchForDate = async () => {
+    if (!profile || !isOwnRecord) {
+      return;
+    }
+
+    try {
+      setRegisteringPunch(true);
+      const nextRecord = await frequenciaService.registerPunch(profile, date);
+      setRecord(nextRecord);
+
+      const isRetroactive = date < getTodayKey();
+      Alert.alert(
+        'Ponto registrado',
+        isRetroactive
+          ? 'Presença registrada com horário esperado para o dia selecionado.'
+          : (nextRecord.horaSaida ? 'Saída registrada com sucesso.' : 'Entrada registrada com sucesso.'),
+      );
+    } catch (error) {
+      Alert.alert('Falha ao bater ponto', getErrorMessage(error, 'Não foi possível registrar o ponto.'));
+    } finally {
+      setRegisteringPunch(false);
+    }
+  };
+
   const handleReject = async () => {
     if (!profile || !targetUserId) {
       return;
@@ -158,9 +190,28 @@ export function RegistroScreen({ route }: Props) {
     <ScreenShell>
       <View style={styles.card}>
         <Text style={styles.title}>{formatDisplayDate(date)}</Text>
+        {dayPolicy ? (
+          <Text style={styles.policyText}>
+            {dayPolicy.tipo === 'feriado'
+              ? 'Feriado'
+              : dayPolicy.tipo === 'ponto_facultativo'
+              ? 'Ponto facultativo'
+              : dayPolicy.tipo === 'sem_expediente'
+              ? 'Sem expediente'
+              : 'Dia útil com política'}
+            {dayPolicy.motivo ? ` - ${dayPolicy.motivo}` : ''}
+          </Text>
+        ) : null}
         <StatusBadge pending={Boolean(record?.horaEntrada && !record?.horaSaida)} status={record?.status ?? 'falta'} />
         <Text style={styles.line}>Entrada: {formatTime(record?.horaEntrada)}</Text>
         <Text style={styles.line}>Saída: {formatTime(record?.horaSaida)}</Text>
+        {canRegisterPunchForDate ? (
+          <AppButton
+            loading={registeringPunch}
+            onPress={handleRegisterPunchForDate}
+            title={date < getTodayKey() ? 'Registrar presença' : 'Bater ponto'}
+          />
+        ) : null}
       </View>
 
       <View style={styles.card}>
@@ -198,7 +249,7 @@ export function RegistroScreen({ route }: Props) {
         <Text style={styles.subtitle}>Assinaturas</Text>
         <Text style={styles.line}>Usuário: {record?.assinaturaUsuario.confirmado ? 'Confirmado' : 'Pendente'}</Text>
         <Text style={styles.line}>Gestor: {record?.assinaturaGestor.confirmado ? 'Validado' : 'Pendente'}</Text>
-        {profile?.id === targetUserId ? <AppButton onPress={handleConfirm} title="Confirmar registro" variant="secondary" /> : null}
+        {isOwnRecord ? <AppButton onPress={handleConfirm} title="Confirmar registro" variant="secondary" /> : null}
         {profile?.tipo === 'gestor' ? (
           <>
             <AppButton onPress={handleValidate} title="Validar justificativa" variant="ghost" />
@@ -238,6 +289,12 @@ const styles = StyleSheet.create({
   line: {
     color: theme.colors.textMuted,
     fontSize: 15,
+  },
+  policyText: {
+    color: theme.colors.info,
+    fontWeight: '700',
+    fontSize: 12,
+    textTransform: 'uppercase',
   },
   infoBox: {
     borderRadius: theme.radius.md,

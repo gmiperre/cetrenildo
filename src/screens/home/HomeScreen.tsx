@@ -11,6 +11,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useMonthlySummary } from '../../hooks/useMonthlySummary';
 import { frequenciaService } from '../../services/frequenciaService';
 import { getErrorMessage } from '../../utils/errors';
+import { formatTime, getTodayKey } from '../../utils/date';
 import { theme } from '../../utils/theme';
 import { AppTabParamList } from '../../navigation/types';
 
@@ -22,6 +23,13 @@ export function HomeScreen({ navigation }: Props) {
   const [punchLoading, setPunchLoading] = useState(false);
   const pendingEmailCount = records.filter((record) => record.justificativaStatus === 'pendente_envio').length;
   const rejectedCount = records.filter((record) => record.justificativaStatus === 'recusada').length;
+
+  const todayRecord = records.find((record) => record.data === getTodayKey()) ?? null;
+  const punchState = !todayRecord?.horaEntrada
+    ? 'none'
+    : !todayRecord.horaSaida
+    ? 'pending'
+    : 'complete';
 
   useFocusEffect(
     useCallback(() => {
@@ -36,8 +44,7 @@ export function HomeScreen({ navigation }: Props) {
 
     try {
       setPunchLoading(true);
-      const record = await frequenciaService.registerPunch(profile);
-      Alert.alert('Registro atualizado', record.horaSaida ? 'Saída registrada com sucesso.' : 'Entrada registrada com sucesso.');
+      await frequenciaService.registerPunch(profile);
       await refresh();
     } catch (error) {
       Alert.alert('Falha ao bater ponto', getErrorMessage(error, 'Tente novamente.'));
@@ -61,9 +68,29 @@ export function HomeScreen({ navigation }: Props) {
       </View>
 
       <View style={styles.heroCard}>
-        <Text style={styles.heroTitle}>Módulo de frequência</Text>
-        <Text style={styles.heroText}>Use o botão único para registrar entrada e saída. Gestores também podem validar ocorrências e acompanhar o time.</Text>
-        <AppButton loading={punchLoading} onPress={handlePunch} title="Bater ponto" />
+        {punchState === 'complete' || punchState === 'pending' ? (
+          <>
+            <Text style={styles.heroBadge}>✓ Frequência registrada</Text>
+            <View style={styles.heroTimesRow}>
+              <View style={styles.heroTimeBlock}>
+                <Text style={styles.heroTimeLabel}>Entrada</Text>
+                <Text style={styles.heroTimeValue}>{formatTime(todayRecord?.horaEntrada)}</Text>
+              </View>
+              <View style={styles.heroTimeDivider} />
+              <View style={styles.heroTimeBlock}>
+                <Text style={styles.heroTimeLabel}>Saída</Text>
+                <Text style={styles.heroTimeValue}>{formatTime(todayRecord?.horaSaida)}</Text>
+              </View>
+            </View>
+            <Text style={styles.heroText}>Tudo certo por hoje. Retorne amanhã para registrar o próximo dia.</Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.heroTitle}>Módulo de frequência</Text>
+            <Text style={styles.heroText}>Bata o ponto para registrar sua presença de hoje com o horário esperado do seu perfil.</Text>
+            <AppButton loading={punchLoading} onPress={handlePunch} title="Bater ponto" />
+          </>
+        )}
       </View>
 
       <View style={styles.summaryRow}>
@@ -120,6 +147,39 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,
     gap: theme.spacing.md,
+  },
+  heroBadge: {
+    color: '#A8EAC8',
+    fontSize: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  heroTimesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+  },
+  heroTimeBlock: {
+    gap: 2,
+  },
+  heroTimeLabel: {
+    color: '#A8EAC8',
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  heroTimeValue: {
+    color: '#FFFFFF',
+    fontSize: 28,
+    fontWeight: '800',
+  },
+  heroTimeDivider: {
+    width: 1,
+    height: 36,
+    backgroundColor: '#2D6E52',
+    marginHorizontal: theme.spacing.sm,
   },
   heroTitle: {
     color: '#FFFFFF',

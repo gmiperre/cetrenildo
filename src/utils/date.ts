@@ -1,5 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
 
+import { CalendarDay } from '../models/calendar';
 import { FrequenciaRegistro, RegistroListItem } from '../models/frequencia';
 
 const MONTH_FORMATTER = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' });
@@ -78,7 +79,7 @@ export const getStatusColor = (status: FrequenciaRegistro['status'], pending = f
   return '#C44536';
 };
 
-export const buildSyntheticRecord = (userId: string, date: string): RegistroListItem => {
+export const buildSyntheticRecord = (userId: string, date: string, status: FrequenciaRegistro['status'] = 'falta'): RegistroListItem => {
   const now = Timestamp.now();
 
   return {
@@ -87,7 +88,7 @@ export const buildSyntheticRecord = (userId: string, date: string): RegistroList
     data: date,
     horaEntrada: null,
     horaSaida: null,
-    status: 'falta',
+    status,
     justificativaTexto: null,
     justificativaCanal: null,
     justificativaStatus: 'sem_justificativa',
@@ -148,4 +149,44 @@ export const getMonthNavigation = (month: number, year: number, direction: 'prev
     month: date.getMonth() + 1,
     year: date.getFullYear(),
   };
+};
+
+export const buildMonthlyTimelineByPolicy = (
+  records: FrequenciaRegistro[],
+  month: number,
+  year: number,
+  userId?: string,
+  calendarPolicies: Record<string, CalendarDay> = {},
+) => {
+  if (!userId) {
+    return [...records].sort((left, right) => right.data.localeCompare(left.data));
+  }
+
+  const byDate = new Map(records.map((record) => [record.data, record]));
+  const today = new Date();
+  const lastDay = month === today.getMonth() + 1 && year === today.getFullYear() ? today.getDate() : new Date(year, month, 0).getDate();
+
+  const timeline: RegistroListItem[] = [];
+
+  for (let day = 1; day <= lastDay; day += 1) {
+    const current = new Date(year, month - 1, day);
+    const dateKey = formatDateKey(current);
+    const policy = calendarPolicies[dateKey];
+    const includeDay = policy ? true : isWeekday(current);
+
+    if (!includeDay) {
+      continue;
+    }
+
+    const existing = byDate.get(dateKey);
+    if (existing) {
+      timeline.push(existing);
+      continue;
+    }
+
+    const syntheticStatus: FrequenciaRegistro['status'] = policy && !policy.requerPonto ? 'abono' : 'falta';
+    timeline.push(buildSyntheticRecord(userId, dateKey, syntheticStatus));
+  }
+
+  return timeline.sort((left, right) => right.data.localeCompare(left.data));
 };

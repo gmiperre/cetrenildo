@@ -14,6 +14,16 @@ Status atual:
 - Fluxo de justificativa por e-mail, sem Firebase Storage
 - Regras do Firestore publicadas no projeto `equipe-cetreina`
 
+Atualizacoes recentes:
+
+- Correcao de permissao para usuario `padrao` registrar e atualizar ponto (entrada/saida)
+- Registro retroativo habilitado no detalhe do dia para datas passadas
+- Um unico toque registra entrada e saida simultaneamente usando o horario esperado do perfil
+- Bloqueio de registro para datas futuras mantido
+- Feedback de erro inline na tela de login (sem Alert, mensagem em vermelho acima de "Esqueceu a senha?")
+- Suporte a dias especiais via colecao `calendarDays` no Firestore (feriados, ponto facultativo, sem expediente)
+- Dias marcados como `requerPonto: false` bloqueiam o botao de ponto e sao sinalizados visualmente no historico
+
 ## Stack
 
 - Expo + React Native
@@ -46,10 +56,13 @@ firebase/
 - Persistência de sessão via Firebase Auth
 - Home com resumo mensal, avisos e botão único de ponto
 - Fluxo de frequência com registro diário, histórico e validação
+- Registro retroativo de presenca com horario esperado (quando aplicavel)
 - Justificativa por e-mail com rastreio no app
 - Controle de acesso no frontend e nas regras do Firestore
 - Registro de eventos de alteração para criação, edição e validação
 - Fila offline básica para criação e atualização de registros
+- Calendario de dias especiais via Firestore (`calendarDays`) com suporte a feriados, ponto facultativo e sem expediente
+- Bloqueio de ponto e sinalização visual para dias marcados como dispensados
 
 ## Configuração Firebase
 
@@ -107,6 +120,12 @@ Deploy com Firebase CLI:
 ```bash
 npx firebase-tools login
 npx firebase-tools deploy --only firestore:rules,firestore:indexes --project <seu-project-id> --config firebase.json
+```
+
+Deploy utilizado neste ambiente:
+
+```bash
+npx firebase-tools deploy --only firestore:rules --project equipe-cetreina
 ```
 
 Importante:
@@ -195,10 +214,14 @@ npx firebase-tools deploy --only firestore:rules,firestore:indexes --project <se
 9. Validacao funcional minima
 
 - Entrar com usuario colaborador.
-- Registrar ponto e salvar justificativa.
+- Registrar ponto (um toque registra entrada e saida pelo horario esperado do perfil).
+- Abrir um dia passado no historico e registrar presenca retroativa.
+- Confirmar que a Home exibe confirmacao de frequencia registrada apos o ponto.
+- Tentar login com senha errada e confirmar mensagem de erro inline (sem Alert).
 - Marcar envio por e-mail e verificar status.
 - Entrar com usuario gestor e validar/recusar justificativa.
 - Confirmar atualizacao no historico e na Home.
+- Inserir um documento em `calendarDays` com `requerPonto: false` e confirmar que o botao de ponto some nesse dia.
 
 Atalhos disponiveis:
 
@@ -245,9 +268,49 @@ O que ainda nao esta coberto:
 6. Confirmar no historico que o status foi atualizado para Validada ou Recusada.
 7. Confirmar que o aviso na Home reflete o novo status.
 
+## Calendario de dias especiais (calendarDays)
+
+A colecao `calendarDays` no Firestore permite marcar dias especificos como feriados, ponto facultativo ou sem expediente.
+
+Estrutura de um documento:
+
+```json
+{
+  "id": "2026-04-21",
+  "data": "2026-04-21",
+  "tipo": "feriado",
+  "requerPonto": false,
+  "motivo": "Tiradentes",
+  "horarioEntradaOverride": null,
+  "horarioSaidaOverride": null
+}
+```
+
+Campos:
+
+- `tipo`: `util` | `feriado` | `ponto_facultativo` | `sem_expediente`
+- `requerPonto`: quando `false`, o botao de ponto e bloqueado e o dia nao conta como falta
+- `motivo`: texto livre exibido no app (ex: "Tiradentes")
+- `horarioEntradaOverride` / `horarioSaidaOverride`: substitui o horario esperado do perfil nesse dia especifico (formato `"HH:MM"`)
+
+Comportamento:
+
+- A tela de registro exibe o tipo e o motivo do dia com destaque visual
+- O historico exibe um chip com o tipo do dia em cada item afetado
+- O resumo mensal exclui dias com `requerPonto: false` da contagem de faltas esperadas
+
+Insercao de documentos:
+
+Ate que uma tela de gestao seja adicionada, os documentos devem ser criados diretamente no Firebase Console ou via script. O ID do documento deve ser a propria data no formato `YYYY-MM-DD`.
+
+Permissoes:
+
+- Leitura: qualquer usuario autenticado
+- Escrita: apenas gestores (`tipo: 'gestor'` no documento do usuario em `users`)
+
 ## Observações
 
 - O app cria automaticamente o documento do usuário na coleção users no primeiro login autenticado.
 - O fluxo opcional de notificações usa expo-notifications como camada cliente. Para envio remoto real via FCM, configure as credenciais nativas do Firebase no projeto Expo/EAS.
 - O registro de eventos atual ajuda no rastreio operacional, mas nao deve ser tratado como trilha de auditoria forte de backend.
-- O resumo mensal considera dias úteis como base para apuração simples de faltas.
+- O resumo mensal considera dias úteis como base para apuração simples de faltas, respeitando `calendarDays` quando disponivel.

@@ -11,10 +11,12 @@ import {
 } from 'firebase/firestore';
 
 import { buildJustificativaUpdateState } from '../domain/frequencia';
+import { CalendarDay } from '../models/calendar';
 import { FrequenciaRegistro, OfflineAction, OfflineActionPayloadMap, OfflineActionType, RegistroStatus, RegistroUpdateInput } from '../models/frequencia';
 import { UserProfile } from '../models/user';
 import { formatDateKey, getMonthDateRange, getTodayKey } from '../utils/date';
 import { getErrorMessage } from '../utils/errors';
+import { calendarService } from './calendarService';
 import { db, ensureFirebaseConfigured } from './firebase';
 import { logService } from './logService';
 import { offlineService } from './offlineService';
@@ -241,16 +243,75 @@ const buildRecordTemplate = (userId: string, date: string, timestamp: Timestamp)
   criadoEm: timestamp,
 });
 
-async function registerPunchRemote(profile: UserProfile) {
-  const today = getTodayKey();
-  const saved = await saveRemoteRecord(profile.id, today, profile.id, (existing, now) => {
+const buildTimestampFromDateAndTime = (date: string, time: string, fallback: Timestamp) => {
+  const [year, month, day] = date.split('-').map(Number);
+  const [hour, minute] = time.split(':').map(Number);
+
+  if ([year, month, day, hour, minute].some(Number.isNaN)) {
+    return fallback;
+  }
+
+  return Timestamp.fromDate(new Date(year, month - 1, day, hour, minute, 0, 0));
+};
+
+const buildExpectedEntryTimestamp = (
+  profile: UserProfile,
+  date: string,
+  fallback: Timestamp,
+  dayPolicy: CalendarDay | null,
+) => {
+  const entryTime = dayPolicy?.horarioEntradaOverride ?? profile.horarioEntradaEsperado;
+  return buildTimestampFromDateAndTime(date, entryTime, fallback);
+};
+
+const buildExpectedExitTimestamp = (
+  profile: UserProfile,
+  date: string,
+  fallback: Timestamp,
+  dayPolicy: CalendarDay | null,
+) => {
+  const exitTime = dayPolicy?.horarioSaidaOverride ?? profile.horarioSaidaEsperado;
+  return buildTimestampFromDateAndTime(date, exitTime, fallback);
+};
+
+const shouldUseExpectedSchedule = (_date: string) => {
+  // Sempre usa horário esperado do perfil, tanto para hoje quanto para datas passadas.
+  return true;
+};
+
+async function registerPunchRemote(profile: UserProfile, date: string) {
+  const dayPolicy = await calendarService.getByDate(date);
+  if (dayPolicy && !dayPolicy.requerPonto) {
+    throw new Error(dayPolicy.motivo ?? 'Este dia está marcado como sem expediente.');
+  }
+
+  const saved = await saveRemoteRecord(profile.id, date, profile.id, (existing, now) => {
+    const useExpectedSchedule = shouldUseExpectedSchedule(date);
+    const expectedEntry = buildExpectedEntryTimestamp(profile, date, now, dayPolicy);
+    const expectedExit = buildExpectedExitTimestamp(profile, date, now, dayPolicy);
+
     if (!existing) {
       return {
         action: 'create',
         next: {
-          ...buildRecordTemplate(profile.id, today, now),
-          horaEntrada: now,
+          ...buildRecordTemplate(profile.id, date, now),
+          horaEntrada: useExpectedSchedule ? expectedEntry : now,
+          horaSaida: useExpectedSchedule ? expectedExit : null,
           status: 'presente' as RegistroStatus,
+        },
+      };
+    }
+
+    if (!existing.horaEntrada) {
+      return {
+        action: 'update',
+        next: {
+          ...existing,
+          horaEntrada: useExpectedSchedule ? expectedEntry : now,
+          horaSaida: useExpectedSchedule ? (existing.horaSaida ?? expectedExit) : existing.horaSaida,
+          status: 'presente' as RegistroStatus,
+          editadoPor: profile.id,
+          editadoEm: now,
         },
       };
     }
@@ -260,7 +321,7 @@ async function registerPunchRemote(profile: UserProfile) {
         action: 'update',
         next: {
           ...existing,
-          horaSaida: now,
+          horaSaida: useExpectedSchedule ? expectedExit : now,
           status: computeStatus(existing.horaEntrada, existing.status),
           editadoPor: profile.id,
           editadoEm: now,
@@ -276,9 +337,9 @@ async function registerPunchRemote(profile: UserProfile) {
     return saved;
   }
 
-  const existing = await findByUserAndDate(profile.id, today);
+  const existing = await findByUserAndDate(profile.id, date);
   if (!existing) {
-    throw new Error('Nenhum registro encontrado para o dia atual.');
+    throw new Error('Nenhum registro encontrado para o dia informado.');
   }
 
   return existing;
@@ -463,33 +524,59 @@ export const frequenciaService = {
     return cachedRecords.filter((item) => item.data >= start && item.data <= end);
   },
 
-  async registerPunch(profile: UserProfile) {
+  async registerPunch(profile: UserProfile, date = getTodayKey()) {
+    if (date > getTodayKey()) {
+      throw new Error('Não é possível registrar ponto para datas futuras.');
+    }
+
     if (await isOnline()) {
-      return registerPunchRemote(profile);
+      return registerPunchRemote(profile, date);
+    }
+
+    const dayPolicy = await calendarService.getByDate(date);
+    if (dayPolicy && !dayPolicy.requerPonto) {
+      throw new Error(dayPolicy.motivo ?? 'Este dia está marcado como sem expediente.');
     }
 
     const now = Timestamp.now();
-    const today = getTodayKey();
-    const existing = await this.getRecordByDate(profile.id, today);
-    const baseRecord = existing ?? buildRecordTemplate(profile.id, today, now);
-    const nextRecord = existing?.horaEntrada && !existing.horaSaida
+    const useExpectedSchedule = shouldUseExpectedSchedule(date);
+    const expectedEntry = buildExpectedEntryTimestamp(profile, date, now, dayPolicy);
+    const expectedExit = buildExpectedExitTimestamp(profile, date, now, dayPolicy);
+    const existing = await this.getRecordByDate(profile.id, date);
+    const baseRecord = existing ?? buildRecordTemplate(profile.id, date, now);
+
+    const nextRecord = !existing
       ? {
           ...baseRecord,
-          horaSaida: now,
+          horaEntrada: useExpectedSchedule ? expectedEntry : now,
+          horaSaida: useExpectedSchedule ? expectedExit : null,
+          status: 'presente' as RegistroStatus,
+          editadoPor: profile.id,
+          editadoEm: now,
+        }
+      : !baseRecord.horaEntrada
+      ? {
+          ...baseRecord,
+          horaEntrada: useExpectedSchedule ? expectedEntry : now,
+          horaSaida: useExpectedSchedule ? (baseRecord.horaSaida ?? expectedExit) : baseRecord.horaSaida,
+          status: 'presente' as RegistroStatus,
+          editadoPor: profile.id,
+          editadoEm: now,
+        }
+      : !baseRecord.horaSaida
+      ? {
+          ...baseRecord,
+          horaSaida: useExpectedSchedule ? expectedExit : now,
           status: computeStatus(baseRecord.horaEntrada, baseRecord.status),
           editadoPor: profile.id,
           editadoEm: now,
         }
       : {
           ...baseRecord,
-          horaEntrada: baseRecord.horaEntrada ?? now,
-          status: 'presente' as RegistroStatus,
-          editadoPor: profile.id,
-          editadoEm: now,
         };
 
     await offlineService.upsertCachedRecord(nextRecord);
-    await offlineService.queueAction(buildAction('registerPunch', { profile }));
+    await offlineService.queueAction(buildAction('registerPunch', { profile, date }));
     return nextRecord;
   },
 
@@ -615,7 +702,7 @@ export const frequenciaService = {
     for (const action of actions) {
       try {
         if (action.type === 'registerPunch') {
-          await registerPunchRemote(action.payload.profile);
+          await registerPunchRemote(action.payload.profile, action.payload.date ?? getTodayKey());
         }
 
         if (action.type === 'updateRegistro') {

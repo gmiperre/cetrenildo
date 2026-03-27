@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { FrequenciaRegistro } from '../models/frequencia';
+import { calendarService } from '../services/calendarService';
 import { frequenciaService } from '../services/frequenciaService';
-import { getExpectedWorkDays } from '../utils/date';
+import { formatDateKey, isWeekday } from '../utils/date';
 
 export function useMonthlySummary(userId?: string) {
   const [records, setRecords] = useState<FrequenciaRegistro[]>([]);
+  const [expectedDays, setExpectedDays] = useState(0);
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -18,8 +20,36 @@ export function useMonthlySummary(userId?: string) {
     const today = new Date();
     const month = today.getMonth() + 1;
     const year = today.getFullYear();
-    const remoteRecords = await frequenciaService.getMonthlyRecords(month, year, { userId });
+    const [remoteRecords, policies] = await Promise.all([
+      frequenciaService.getMonthlyRecords(month, year, { userId }),
+      calendarService.getMonthlyPolicies(month, year),
+    ]);
     setRecords(remoteRecords);
+
+    const lastDay = new Date(year, month, 0).getDate();
+    let expected = 0;
+    for (let day = 1; day <= lastDay; day += 1) {
+      const current = new Date(year, month - 1, day);
+      if (current > today) {
+        break;
+      }
+
+      const dateKey = formatDateKey(current);
+      const policy = policies[dateKey];
+
+      if (policy) {
+        if (policy.requerPonto) {
+          expected += 1;
+        }
+        continue;
+      }
+
+      if (isWeekday(current)) {
+        expected += 1;
+      }
+    }
+
+    setExpectedDays(expected);
     setLoading(false);
   }, [userId]);
 
@@ -27,14 +57,12 @@ export function useMonthlySummary(userId?: string) {
     refresh().catch(() => setLoading(false));
   }, [refresh]);
 
-  const today = new Date();
-  const expected = getExpectedWorkDays(today.getMonth() + 1, today.getFullYear());
   const workedDays = records.filter((record) => record.status === 'presente' || record.status === 'abono').length;
 
   return {
     loading,
     workedDays,
-    missedDays: Math.max(expected - workedDays, 0),
+    missedDays: Math.max(expectedDays - workedDays, 0),
     records,
     refresh,
   };

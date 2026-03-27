@@ -39,7 +39,7 @@ export interface FrequenciaRegistro {
 }
 
 export type OfflineActionPayloadMap = {
-  registerPunch: { profile: UserProfile };
+  registerPunch: { profile: UserProfile; date?: string };
   updateRegistro: RegistroUpdateInput;
   confirmRegistro: { userId: string; date: string; actorId: string };
   validateRegistro: { userId: string; date: string; actorId: string };

@@ -7,11 +7,13 @@ import { getJustificativaStatusLabel } from '../../domain/frequencia';
 import { ScreenShell } from '../../components/ScreenShell';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useAuth } from '../../hooks/useAuth';
+import { CalendarDay } from '../../models/calendar';
 import { RegistroListItem } from '../../models/frequencia';
 import { UserProfile } from '../../models/user';
+import { calendarService } from '../../services/calendarService';
 import { frequenciaService } from '../../services/frequenciaService';
 import { userService } from '../../services/userService';
-import { buildMonthlyTimeline, formatDisplayDate, formatMonthLabel, formatTime, getMonthNavigation } from '../../utils/date';
+import { buildMonthlyTimelineByPolicy, formatDisplayDate, formatMonthLabel, formatTime, getMonthNavigation } from '../../utils/date';
 import { theme } from '../../utils/theme';
 import { FrequenciaStackParamList } from '../../navigation/types';
 
@@ -22,6 +24,7 @@ export function HistoricoScreen({ navigation }: Props) {
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
   const [records, setRecords] = useState<RegistroListItem[]>([]);
+  const [calendarPolicies, setCalendarPolicies] = useState<Record<string, CalendarDay>>({});
   const [team, setTeam] = useState<UserProfile[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | undefined>(profile?.id);
 
@@ -41,7 +44,10 @@ export function HistoricoScreen({ navigation }: Props) {
       canViewAll: profile.tipo === 'gestor' && !selectedUserId,
     });
 
-    setRecords(buildMonthlyTimeline(remoteRecords, month, year, selectedUserId));
+    const monthPolicies = await calendarService.getMonthlyPolicies(month, year);
+    setCalendarPolicies(monthPolicies);
+
+    setRecords(buildMonthlyTimelineByPolicy(remoteRecords, month, year, selectedUserId, monthPolicies));
   }, [month, profile, selectedUserId, year]);
 
   useFocusEffect(
@@ -101,6 +107,17 @@ export function HistoricoScreen({ navigation }: Props) {
               </View>
               <StatusBadge pending={Boolean(item.horaEntrada && !item.horaSaida)} status={item.status} />
             </View>
+            {calendarPolicies[item.data] ? (
+              <Text style={styles.recordPolicy}>
+                {calendarPolicies[item.data].tipo === 'feriado'
+                  ? 'Feriado'
+                  : calendarPolicies[item.data].tipo === 'ponto_facultativo'
+                  ? 'Ponto facultativo'
+                  : calendarPolicies[item.data].tipo === 'sem_expediente'
+                  ? 'Sem expediente'
+                  : 'Dia útil com política'}
+              </Text>
+            ) : null}
             <Text style={styles.recordText}>Entrada: {formatTime(item.horaEntrada)}</Text>
             <Text style={styles.recordText}>Saída: {formatTime(item.horaSaida)}</Text>
             <Text style={styles.recordText}>Justificativa: {getJustificativaStatusLabel(item.justificativaStatus)}</Text>
@@ -202,5 +219,11 @@ const styles = StyleSheet.create({
   },
   recordText: {
     color: theme.colors.textMuted,
+  },
+  recordPolicy: {
+    color: theme.colors.info,
+    fontWeight: '700',
+    fontSize: 12,
+    textTransform: 'uppercase',
   },
 });

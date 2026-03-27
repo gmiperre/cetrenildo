@@ -17,6 +17,14 @@ const parseHourAndMinute = (time: string) => {
   return { hour, minute };
 };
 
+const withTimeout = <T>(promise: Promise<T>, timeoutMessage: string, timeoutMs = 5000) => {
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]);
+};
+
 export const notificationService = {
   configure() {
     Notifications.setNotificationChannelAsync('default', {
@@ -39,20 +47,19 @@ export const notificationService = {
 
     try {
       console.log('📲 Solicitando permissões de notificação...');
-      
-      // Timeout de 5 segundos para evitar que fica pendurada
-      const permissionsPromise = Notifications.getPermissionsAsync();
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout ao solicitar permissões')), 5000)
+
+      const permissions = await withTimeout(
+        Notifications.getPermissionsAsync(),
+        'Timeout ao solicitar permissões',
       );
-      
-      const permissions = await Promise.race([permissionsPromise, timeoutPromise]) as Notifications.NotificationPermissionsStatus;
       const granted = permissions.granted || permissions.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
 
       if (!granted) {
         console.log('📲 Permissões não concedidas - solicitando...');
-        const requestedPromise = Notifications.requestPermissionsAsync();
-        const requested = await Promise.race([requestedPromise, timeoutPromise]) as Notifications.NotificationPermissionsStatus;
+        const requested = await withTimeout(
+          Notifications.requestPermissionsAsync(),
+          'Timeout ao solicitar permissões',
+        );
         
         if (!requested.granted) {
           console.log('⚠️ Usuário recusou permissões');
@@ -61,11 +68,12 @@ export const notificationService = {
       }
 
       console.log('📲 Obtendo token de push...');
-      const tokenPromise = Notifications.getExpoPushTokenAsync({
-        projectId: Constants.expoConfig?.extra?.eas?.projectId,
-      });
-      
-      const token = await Promise.race([tokenPromise, timeoutPromise]);
+      const token = await withTimeout(
+        Notifications.getExpoPushTokenAsync({
+          projectId: Constants.expoConfig?.extra?.eas?.projectId,
+        }),
+        'Timeout ao obter token de push',
+      );
       console.log('✅ Token de push obtido');
       return token.data;
     } catch (error) {
