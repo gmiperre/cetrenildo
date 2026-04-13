@@ -29,15 +29,28 @@
       ]
     },
     "plugins": [
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permita acesso às fotos para selecionar uma imagem de perfil 3x4.",
+          "cameraPermission": "Permita acesso à câmera para capturar sua foto de perfil 3x4."
+        }
+      ]
     ],
     "extra": {
       "firebase": {
         "apiKey": "AIzaSyDUwmHXRMjx64MQPaIjW2oALiPJdgKfElI",
         "authDomain": "equipe-cetreina.firebaseapp.com",
         "projectId": "equipe-cetreina",
+        "storageBucket": "equipe-cetreina.appspot.com",
         "messagingSenderId": "979712783428",
         "appId": "1:979712783428:web:a05dc8c54ac0511d58b811"
+      },
+      "supabase": {
+        "url": "https://ohzcnlcfduvfxbgppwgl.supabase.co",
+        "anonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9oemNubGNmZHV2ZnhiZ3Bwd2dsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5NjYxODksImV4cCI6MjA5MTU0MjE4OX0.3kOtBZfcl2PmrjtPmqNQo7uS-iM-rOW187hcMd7JtRw",
+        "absenceBucket": "absence-documents"
       }
     },
     "web": {

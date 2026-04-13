@@ -1,6 +1,6 @@
 # Equipe Cetreina
 
-Aplicativo mobile em React Native com Expo e backend Firebase para apoiar rotinas de RH, com foco inicial em controle de frequência e estrutura pronta para expansao modular.
+Aplicativo mobile em React Native com Expo e backend Firebase para apoiar rotinas de RH, com foco inicial em controle de frequencia e estrutura pronta para expansao modular.
 
 Documentacao complementar:
 
@@ -12,22 +12,17 @@ Status atual:
 - Aplicacao com suporte a Android, iOS e Web
 - Backend usando Firebase Authentication e Firestore
 - Fluxo de justificativa por e-mail, sem Firebase Storage
+- Fluxo bilateral de contestacao de presenca entre gestor e funcionario
 - Regras do Firestore publicadas no projeto `equipe-cetreina`
 
 Atualizacoes recentes:
 
-- Navegacao reorganizada para o fluxo `login > home > modulos > frequencia`
-- Tela `Modulos` adicionada como catalogo para expansao de dominios como Frequencia e Ferias
-- Placeholder inicial do modulo de Ferias adicionado para guiar a proxima etapa da evolucao
-- Cadastro de funcionario direto pela Home do gestor, com e-mail, senha inicial e carga horaria esperada
-- Rollback automatico do usuario no Authentication se a gravacao do perfil falhar
-- Correcao de permissao para usuario `padrao` registrar e atualizar ponto (entrada/saida)
-- Registro retroativo habilitado no detalhe do dia para datas passadas
-- Um unico toque registra entrada e saida simultaneamente usando o horario esperado do perfil
-- Bloqueio de registro para datas futuras mantido
-- Feedback de erro inline na tela de login (sem Alert, mensagem em vermelho acima de "Esqueceu a senha?")
-- Suporte a dias especiais via colecao `calendarDays` no Firestore (feriados, ponto facultativo, sem expediente)
-- Dias marcados como `requerPonto: false` bloqueiam o botao de ponto e sao sinalizados visualmente no historico
+- Fluxo completo de contestacao de presenca: gestor contesta, funcionario responde, gestor decide
+- Reabertura de contestacao encerrada com motivo obrigatorio e contador de ciclos para auditoria
+- Notificacoes in-app para abertura, encerramento e reabertura de contestacao
+- Suporte offline para todas as acoes de contestacao via fila `offlineService`
+- Regras do Firestore atualizadas para restringir escrita de campos de contestacao por papel
+- Correcao do erro de TypeScript em `firebase.ts` relacionado a `getReactNativePersistence`
 
 ## Stack
 
@@ -70,6 +65,10 @@ firebase/
 - Fila offline basica para criacao e atualizacao de registros
 - Calendario de dias especiais via Firestore `calendarDays` com suporte a feriados, ponto facultativo e sem expediente
 - Bloqueio de ponto e sinalizacao visual para dias marcados como dispensados
+- Fluxo bilateral de contestacao de presenca (gestor contesta, funcionario responde, gestor decide)
+- Reabertura de contestacao encerrada com motivo obrigatorio e rastreio de ciclos
+- Notificacoes in-app para eventos de contestacao (`presenca_contestada`, `contestacao_encerrada`, `contestacao_reaberta`)
+- Suporte offline completo para todas as acoes de contestacao
 
 ## Fluxo de navegacao autenticada
 
@@ -306,6 +305,12 @@ npx firebase-tools deploy --only firestore:rules,firestore:indexes --project <se
 - Entrar com usuario gestor e validar/recusar justificativa.
 - Confirmar atualizacao no historico e na Home.
 - Inserir um documento em `calendarDays` com `requerPonto: false` e confirmar que o botao de ponto some nesse dia.
+- Entrar com usuario gestor e contestar um registro de presenca de um funcionario informando o motivo.
+- Confirmar que o funcionario recebe notificacao do tipo `presenca_contestada`.
+- Entrar com usuario colaborador e enviar resposta a contestacao pela tela do dia.
+- Entrar com usuario gestor e encerrar a contestacao escolhendo manter falta ou reverter para presente.
+- Confirmar que o funcionario recebe notificacao `contestacao_encerrada` com a decisao.
+- Opcionalmente, reabrir a contestacao encerrada com motivo e confirmar incremento do ciclo.
 
 Atalhos disponiveis:
 
@@ -351,6 +356,64 @@ O que ainda nao esta coberto:
 5. Validar ou recusar a justificativa (recusa exige observacao).
 6. Confirmar no historico que o status foi atualizado para Validada ou Recusada.
 7. Confirmar que o aviso na Home reflete o novo status.
+
+## Fluxo de contestacao de presenca
+
+O app suporta um ciclo bilateral de contestacao para registros com status `presente`. O fluxo envolve tres fases e dois atores: o gestor e o funcionario.
+
+### Fase 1 — Gestor contesta
+
+1. O gestor acessa o detalhe do funcionario (`FuncionarioDetalheScreen`).
+2. Toca em `Contestar presenca` no registro em questao e informa o motivo.
+3. O status do registro muda para `presenca_contestada`.
+4. O funcionario recebe uma notificacao in-app do tipo `presenca_contestada`.
+
+### Fase 2 — Funcionario responde
+
+1. O funcionario acessa o registro do dia (`RegistroScreen`) ou toca na notificacao.
+2. O app exibe um card de contestacao com o motivo informado pelo gestor.
+3. O funcionario digita sua resposta e envia.
+4. O campo `contestacaoRespostaFuncionario` e gravado e o status interno muda para `respondida`.
+
+### Fase 3 — Gestor decide
+
+1. O gestor retorna ao detalhe do funcionario.
+2. Escolhe `Manter falta` ou `Reverter para presente`.
+3. O status do registro e atualizado (`falta` ou `presente`) e a contestacao e encerrada.
+4. O funcionario recebe notificacao `contestacao_encerrada` com a decisao.
+
+### Reabertura de contestacao
+
+Apos uma contestacao ser encerrada, o gestor pode reabri-la se identificar um erro:
+
+1. O gestor toca em `Reabrir contestacao` no detalhe do funcionario.
+2. Informa o motivo da reabertura (obrigatorio).
+3. O campo `contestacaoCiclo` e incrementado para preservar o historico de ciclos anteriores.
+4. O funcionario recebe notificacao `contestacao_reaberta`.
+5. O fluxo retorna a Fase 2.
+
+### Campos do modelo relacionados
+
+| Campo | Descricao |
+|---|---|
+| `contestacaoStatus` | `sem_contestacao` \| `em_contestacao` \| `respondida` \| `encerrada` |
+| `contestacaoCiclo` | Contador de ciclos (0 = nunca contestado, incrementa a cada abertura) |
+| `contestacaoMotivo` | Motivo informado pelo gestor ao contestar |
+| `contestacaoRespostaFuncionario` | Resposta enviada pelo funcionario |
+| `contestacaoDecisao` | `mantida_falta` \| `revertida_presente` |
+| `contestacaoDecididoPor` | UID do gestor que decidiu |
+| `contestacaoDecididaEm` | Timestamp da decisao |
+| `contestacaoReaberturaMotivo` | Motivo da reabertura (quando aplicavel) |
+| `contestacaoReabertaPor` | UID do gestor que reabriu |
+| `contestacaoReabertaEm` | Timestamp da reabertura |
+
+### Seguranca
+
+As regras do Firestore garantem que:
+
+- Apenas gestores podem abrir, encerrar ou reabrir uma contestacao.
+- O funcionario so pode gravar `contestacaoRespostaFuncionario` e `contestacaoStatus=respondida`; todos os demais campos ficam congelados para ele.
+- Campos de ciclo, decisao e reabertura sao imutaveis pelo proprio funcionario.
 
 ## Calendario de dias especiais (calendarDays)
 
