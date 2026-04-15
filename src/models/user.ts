@@ -7,5 +7,11 @@ export interface UserProfile {
   tipo: UserRole;
   horarioEntradaEsperado: string;
   horarioSaidaEsperado: string;
+  fotoPerfilUri?: string | null;
   pushToken?: string | null;
 }
+
+export type UserDirectoryEntry = Pick<
+  UserProfile,
+  'id' | 'nome' | 'email' | 'tipo' | 'horarioEntradaEsperado' | 'horarioSaidaEsperado'
+>;

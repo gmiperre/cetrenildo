@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { CadastroFuncionarioScreen } from '../screens/equipe/CadastroFuncionarioScreen';
 import { EquipeScreen } from '../screens/equipe/EquipeScreen';
+import { FuncionarioDetalheScreen } from '../screens/equipe/FuncionarioDetalheScreen';
 import { theme } from '../utils/theme';
 import { EquipeStackParamList } from './types';
 
@@ -33,6 +34,11 @@ export function EquipeNavigator() {
         component={CadastroFuncionarioScreen}
         name="CadastroFuncionario"
         options={{ title: 'Cadastrar Funcionário' }}
+      />
+      <Stack.Screen
+        component={FuncionarioDetalheScreen}
+        name="FuncionarioDetalhe"
+        options={{ title: 'Perfil do Funcionário' }}
       />
     </Stack.Navigator>
   );

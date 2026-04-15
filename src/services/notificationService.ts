@@ -1,7 +1,13 @@
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+
+import { calendarService } from './calendarService';
+import { frequenciaService } from './frequenciaService';
+import { getTodayKey, isWorkdayForDate } from '../utils/date';
+import { messageService } from './messageService';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -23,6 +29,33 @@ const withTimeout = <T>(promise: Promise<T>, timeoutMessage: string, timeoutMs =
   });
 
   return Promise.race([promise, timeoutPromise]);
+};
+
+const PENDING_ATTENDANCE_LAST_SENT_PREFIX = 'pending-attendance-last-sent';
+const PENDING_ATTENDANCE_HISTORY_PREFIX = 'pending-attendance-history';
+const NOTIFICATION_RETENTION_DAYS = 90;
+
+type PendingAttendanceHistoryItem = {
+  sentAt: string;
+  pendingCount: number;
+  oldestPendingDate: string | null;
+};
+
+const getPendingAttendanceStorageKey = (userId: string) => `${PENDING_ATTENDANCE_LAST_SENT_PREFIX}:${userId}`;
+const getPendingAttendanceHistoryKey = (userId: string) => `${PENDING_ATTENDANCE_HISTORY_PREFIX}:${userId}`;
+
+const getRetentionCutoffTime = () => {
+  const now = new Date();
+  now.setDate(now.getDate() - NOTIFICATION_RETENTION_DAYS);
+  return now.getTime();
+};
+
+const prunePendingAttendanceHistory = (history: PendingAttendanceHistoryItem[]) => {
+  const cutoff = getRetentionCutoffTime();
+  return history.filter((item) => {
+    const timestamp = new Date(item.sentAt).getTime();
+    return Number.isFinite(timestamp) && timestamp >= cutoff;
+  });
 };
 
 export const notificationService = {
@@ -107,6 +140,100 @@ export const notificationService = {
       console.log('✅ Notificação agendada para', time);
     } catch (error) {
       console.warn('⚠️ Erro ao agendar notificação:', error);
+    }
+  },
+
+  async syncDailyReminderMessage(userId: string) {
+    if (Platform.OS === 'web') {
+      return;
+    }
+
+    try {
+      const todayKey = getTodayKey();
+      const [todayPolicy, todayRecord] = await Promise.all([
+        calendarService.getByDate(todayKey),
+        frequenciaService.getRecordByDate(userId, todayKey),
+      ]);
+
+      if (!isWorkdayForDate(todayKey, todayPolicy)) {
+        return;
+      }
+
+      const hasCompletePunch = Boolean(todayRecord?.horaEntrada && todayRecord?.horaSaida);
+      const isJustifiedAbsence = todayRecord?.status === 'falta_justificada' || todayRecord?.justificativaStatus === 'validada';
+      const isExcusedDay = todayRecord?.status === 'abono';
+
+      if (hasCompletePunch || isJustifiedAbsence || isExcusedDay) {
+        return;
+      }
+
+      await messageService.pruneExpiredMessages(userId);
+      await messageService.upsertDailyReminderMessage(userId, todayKey);
+    } catch (error) {
+      console.warn('⚠️ Erro ao sincronizar lembrete diário na caixa de mensagens:', error);
+    }
+  },
+
+  async notifyPendingAttendance(userId: string) {
+    if (Platform.OS === 'web') {
+      return;
+    }
+
+    try {
+      const todayKey = getTodayKey();
+      const storageKey = getPendingAttendanceStorageKey(userId);
+      const historyKey = getPendingAttendanceHistoryKey(userId);
+      const lastSentDate = await AsyncStorage.getItem(storageKey);
+      const rawHistory = await AsyncStorage.getItem(historyKey);
+      const parsedHistory = rawHistory ? (JSON.parse(rawHistory) as PendingAttendanceHistoryItem[]) : [];
+      const retainedHistory = prunePendingAttendanceHistory(parsedHistory);
+
+      if (retainedHistory.length !== parsedHistory.length) {
+        await AsyncStorage.setItem(historyKey, JSON.stringify(retainedHistory));
+      }
+
+      if (lastSentDate === todayKey) {
+        return;
+      }
+
+      const pendingDates = await frequenciaService.getPendingAttendanceDates(userId, todayKey);
+      await messageService.pruneExpiredMessages(userId);
+
+      if (!pendingDates.length) {
+        return;
+      }
+
+      await messageService.upsertPendingAttendanceMessage(
+        userId,
+        todayKey,
+        pendingDates.length,
+        pendingDates[0] ?? null,
+      );
+
+      const firstPending = pendingDates[0].split('-').reverse().join('/');
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Frequência pendente',
+          body:
+            pendingDates.length === 1
+              ? `Você tem 1 pendência de frequência (${firstPending}). Toque para regularizar.`
+              : `Você tem ${pendingDates.length} pendências de frequência. A mais antiga é ${firstPending}.`,
+        },
+        trigger: null,
+      });
+
+      await AsyncStorage.setItem(storageKey, todayKey);
+      const updatedHistory = prunePendingAttendanceHistory([
+        ...retainedHistory,
+        {
+          sentAt: new Date().toISOString(),
+          pendingCount: pendingDates.length,
+          oldestPendingDate: pendingDates[0] ?? null,
+        },
+      ]);
+      await AsyncStorage.setItem(historyKey, JSON.stringify(updatedHistory));
+    } catch (error) {
+      console.warn('⚠️ Erro ao notificar pendências de frequência:', error);
     }
   },
 };

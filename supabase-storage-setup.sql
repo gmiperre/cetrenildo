@@ -19,7 +19,10 @@ for insert
 to anon
 with check (
   bucket_id = 'absence-documents'
-  and name like 'ausencias/%'
+  and (
+    name like 'ausencias/%'
+    or name like 'folhas/%'
+  )
 );
 
 -- Read policy (select) required to create signed URLs from client
@@ -30,7 +33,10 @@ for select
 to anon
 using (
   bucket_id = 'absence-documents'
-  and name like 'ausencias/%'
+  and (
+    name like 'ausencias/%'
+    or name like 'folhas/%'
+  )
 );
 
 -- Update policy (optional)
@@ -41,11 +47,17 @@ for update
 to anon
 using (
   bucket_id = 'absence-documents'
-  and name like 'ausencias/%'
+  and (
+    name like 'ausencias/%'
+    or name like 'folhas/%'
+  )
 )
 with check (
   bucket_id = 'absence-documents'
-  and name like 'ausencias/%'
+  and (
+    name like 'ausencias/%'
+    or name like 'folhas/%'
+  )
 );
 
 -- Delete policy (optional)
@@ -56,5 +68,8 @@ for delete
 to anon
 using (
   bucket_id = 'absence-documents'
-  and name like 'ausencias/%'
+  and (
+    name like 'ausencias/%'
+    or name like 'folhas/%'
+  )
 );

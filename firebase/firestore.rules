@@ -29,6 +29,7 @@ service cloud.firestore {
         'nome',
         'horarioEntradaEsperado',
         'horarioSaidaEsperado',
+        'fotoPerfilUri',
         'pushToken'
       ]);
     }
@@ -48,6 +49,32 @@ service cloud.firestore {
         && userProfileEditableByOwner();
     }
 
+    function userDirectoryEditableFields() {
+      return [
+        'id',
+        'nome',
+        'email',
+        'tipo',
+        'horarioEntradaEsperado',
+        'horarioSaidaEsperado'
+      ];
+    }
+
+    function ownerCanWriteOwnUserDirectory(userId) {
+      return isOwner(userId)
+        && request.resource.data.id == userId
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(userDirectoryEditableFields());
+    }
+
+    function ownerCanCreateOwnUserDirectory(userId) {
+      return isOwner(userId)
+        && request.resource.data.id == userId
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.tipo == 'padrao'
+        && request.resource.data.keys().hasOnly(userDirectoryEditableFields());
+    }
+
     function ownerEditableRegistroFields() {
       return [
         'justificativaTexto',
@@ -57,6 +84,14 @@ service cloud.firestore {
         'justificativaEmailEm',
         'justificativaEmailAssunto',
         'justificativaEmailProtocolo',
+        'justificativaDocumentoNome',
+        'justificativaDocumentoMime',
+        'justificativaDocumentoTamanhoBytes',
+        'justificativaDocumentoAnexadoEm',
+        'justificativaDocumentoStoragePath',
+        'justificativaObservacaoGestor',
+        'justificativaValidadaPor',
+        'justificativaValidadaEm',
         'assinaturaUsuario',
         'editadoPor',
         'editadoEm'
@@ -75,6 +110,11 @@ service cloud.firestore {
         && request.resource.data.justificativaEmailEm == resource.data.justificativaEmailEm
         && request.resource.data.justificativaEmailAssunto == resource.data.justificativaEmailAssunto
         && request.resource.data.justificativaEmailProtocolo == resource.data.justificativaEmailProtocolo
+        && request.resource.data.justificativaDocumentoNome == resource.data.justificativaDocumentoNome
+        && request.resource.data.justificativaDocumentoMime == resource.data.justificativaDocumentoMime
+        && request.resource.data.justificativaDocumentoTamanhoBytes == resource.data.justificativaDocumentoTamanhoBytes
+        && request.resource.data.justificativaDocumentoAnexadoEm == resource.data.justificativaDocumentoAnexadoEm
+        && request.resource.data.justificativaDocumentoStoragePath == resource.data.justificativaDocumentoStoragePath
         && request.resource.data.justificativaObservacaoGestor == resource.data.justificativaObservacaoGestor
         && request.resource.data.justificativaValidadaPor == resource.data.justificativaValidadaPor
         && request.resource.data.justificativaValidadaEm == resource.data.justificativaValidadaEm
@@ -101,9 +141,9 @@ service cloud.firestore {
         && request.resource.data.assinaturaUsuario.confirmado in [true, false]
         && request.resource.data.assinaturaUsuario.userId in [null, request.auth.uid]
         && request.resource.data.assinaturaGestor == resource.data.assinaturaGestor
-        && request.resource.data.justificativaObservacaoGestor == resource.data.justificativaObservacaoGestor
-        && request.resource.data.justificativaValidadaPor == resource.data.justificativaValidadaPor
-        && request.resource.data.justificativaValidadaEm == resource.data.justificativaValidadaEm
+        && request.resource.data.justificativaObservacaoGestor in [resource.data.justificativaObservacaoGestor, null]
+        && request.resource.data.justificativaValidadaPor in [resource.data.justificativaValidadaPor, null]
+        && request.resource.data.justificativaValidadaEm in [resource.data.justificativaValidadaEm, null]
         && request.resource.data.editadoPor == request.auth.uid
         && request.resource.data.justificativaStatus != 'validada'
         && request.resource.data.justificativaStatus != 'recusada'
@@ -117,12 +157,252 @@ service cloud.firestore {
         && request.resource.data.assinaturaGestor.userId == null
         && request.resource.data.assinaturaGestor.timestamp == null
         && request.resource.data.justificativaValidadaPor == null
-        && request.resource.data.justificativaValidadaEm == null;
+        && request.resource.data.justificativaValidadaEm == null
+        && request.resource.data.contestacaoStatus == 'sem_contestacao'
+        && request.resource.data.contestacaoCiclo == 0
+        && request.resource.data.contestacaoMotivo == null
+        && request.resource.data.contestacaoDecisao == null
+        && request.resource.data.contestacaoReaberturaMotivo == null
+        && request.resource.data.contestacaoReabertaPor == null
+        && request.resource.data.contestacaoReabertaEm == null;
+    }
+
+    function ownerCanRespondToContestacao() {
+      return isOwner(resource.data.userId)
+        && resource.data.contestacaoStatus == 'em_contestacao'
+        && request.resource.data.contestacaoStatus == 'respondida'
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.data == resource.data.data
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.horaEntrada == resource.data.horaEntrada
+        && request.resource.data.horaSaida == resource.data.horaSaida
+        && request.resource.data.contestacaoMotivo == resource.data.contestacaoMotivo
+        && request.resource.data.contestacaoCiclo == resource.data.contestacaoCiclo
+        && request.resource.data.contestacaoDecisao == resource.data.contestacaoDecisao
+        && request.resource.data.contestacaoDecididoPor == resource.data.contestacaoDecididoPor
+        && request.resource.data.contestacaoDecididaEm == resource.data.contestacaoDecididaEm
+        && request.resource.data.contestacaoReaberturaMotivo == resource.data.contestacaoReaberturaMotivo
+        && request.resource.data.contestacaoReabertaPor == resource.data.contestacaoReabertaPor
+        && request.resource.data.contestacaoReabertaEm == resource.data.contestacaoReabertaEm
+        && request.resource.data.editadoPor == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'contestacaoStatus',
+          'contestacaoRespostaFuncionario',
+          'editadoPor',
+          'editadoEm'
+        ]);
     }
 
     function ownerCanReadOwnRegistroById(registroId) {
       return isAuthenticated()
         && registroId.matches('^' + request.auth.uid + '_[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function ownerCanReadOwnFolhaById(folhaId) {
+      return isAuthenticated()
+        && folhaId.matches('^' + request.auth.uid + '_[0-9]{4}-[0-9]{2}$');
+    }
+
+    function ownerCanCreateOwnFolha() {
+      return isOwner(request.resource.data.userId)
+        && request.resource.data.emitidoPor == request.auth.uid
+        && request.resource.data.mes is int
+        && request.resource.data.ano is int
+        && request.resource.data.status in ['emitida', 'aguardando_upload_funcionario']
+        && request.resource.data.keys().hasAll([
+          'id',
+          'userId',
+          'mes',
+          'ano',
+          'status',
+          'pdfOriginalPath',
+          'pdfOriginalHash',
+          'pdfFuncionarioAssinadoPath',
+          'pdfFuncionarioAssinadoHash',
+          'pdfGestorFinalPath',
+          'pdfGestorFinalHash',
+          'enviadoFuncionarioEm',
+          'revisadoGestorPor',
+          'revisadoGestorEm',
+          'finalizadoGestorPor',
+          'finalizadoGestorEm',
+          'cienteFuncionarioPor',
+          'cienteFuncionarioEm',
+          'snapshotUsuario',
+          'snapshotResumo',
+          'motivoRejeicao',
+          'emitidoPor',
+          'createdAt',
+          'updatedAt'
+        ]);
+    }
+
+    function ownerCanReemitOwnFolha() {
+      return isOwner(resource.data.userId)
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.mes == resource.data.mes
+        && request.resource.data.ano == resource.data.ano
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.emitidoPor == request.auth.uid
+        && request.resource.data.status == 'aguardando_upload_funcionario'
+        && request.resource.data.pdfFuncionarioAssinadoPath == null
+        && request.resource.data.pdfFuncionarioAssinadoHash == null
+        && request.resource.data.pdfGestorFinalPath == null
+        && request.resource.data.pdfGestorFinalHash == null
+        && request.resource.data.enviadoFuncionarioEm == null
+        && request.resource.data.revisadoGestorPor == null
+        && request.resource.data.revisadoGestorEm == null
+        && request.resource.data.finalizadoGestorPor == null
+        && request.resource.data.finalizadoGestorEm == null
+        && request.resource.data.cienteFuncionarioPor == null
+        && request.resource.data.cienteFuncionarioEm == null
+        && request.resource.data.motivoRejeicao == null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'pdfOriginalPath',
+          'pdfOriginalHash',
+          'pdfFuncionarioAssinadoPath',
+          'pdfFuncionarioAssinadoHash',
+          'pdfGestorFinalPath',
+          'pdfGestorFinalHash',
+          'enviadoFuncionarioEm',
+          'revisadoGestorPor',
+          'revisadoGestorEm',
+          'finalizadoGestorPor',
+          'finalizadoGestorEm',
+          'cienteFuncionarioPor',
+          'cienteFuncionarioEm',
+          'snapshotUsuario',
+          'snapshotResumo',
+          'motivoRejeicao',
+          'emitidoPor',
+          'updatedAt'
+        ]);
+    }
+
+    function ownerCanUploadSignedFolha() {
+      return isOwner(resource.data.userId)
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.mes == resource.data.mes
+        && request.resource.data.ano == resource.data.ano
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.emitidoPor == resource.data.emitidoPor
+        && request.resource.data.pdfOriginalPath == resource.data.pdfOriginalPath
+        && request.resource.data.pdfOriginalHash == resource.data.pdfOriginalHash
+        && request.resource.data.snapshotUsuario == resource.data.snapshotUsuario
+        && request.resource.data.snapshotResumo == resource.data.snapshotResumo
+        && request.resource.data.revisadoGestorPor == resource.data.revisadoGestorPor
+        && request.resource.data.revisadoGestorEm == resource.data.revisadoGestorEm
+        && request.resource.data.pdfGestorFinalPath == resource.data.pdfGestorFinalPath
+        && request.resource.data.pdfGestorFinalHash == resource.data.pdfGestorFinalHash
+        && request.resource.data.finalizadoGestorPor == resource.data.finalizadoGestorPor
+        && request.resource.data.finalizadoGestorEm == resource.data.finalizadoGestorEm
+        && request.resource.data.cienteFuncionarioPor == resource.data.cienteFuncionarioPor
+        && request.resource.data.cienteFuncionarioEm == resource.data.cienteFuncionarioEm
+        && request.resource.data.motivoRejeicao in [resource.data.motivoRejeicao, null]
+        && request.resource.data.status in ['enviada_funcionario', 'aguardando_upload_funcionario']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'pdfFuncionarioAssinadoPath',
+          'pdfFuncionarioAssinadoHash',
+          'enviadoFuncionarioEm',
+          'motivoRejeicao',
+          'updatedAt'
+        ]);
+    }
+
+    function managerCanReviewFolha() {
+      return isManager()
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.mes == resource.data.mes
+        && request.resource.data.ano == resource.data.ano
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.emitidoPor == resource.data.emitidoPor
+        && request.resource.data.pdfOriginalPath == resource.data.pdfOriginalPath
+        && request.resource.data.pdfOriginalHash == resource.data.pdfOriginalHash
+        && request.resource.data.snapshotUsuario == resource.data.snapshotUsuario
+        && request.resource.data.snapshotResumo == resource.data.snapshotResumo
+        && request.resource.data.pdfFuncionarioAssinadoPath == resource.data.pdfFuncionarioAssinadoPath
+        && request.resource.data.pdfFuncionarioAssinadoHash == resource.data.pdfFuncionarioAssinadoHash
+        && request.resource.data.pdfGestorFinalPath == resource.data.pdfGestorFinalPath
+        && request.resource.data.pdfGestorFinalHash == resource.data.pdfGestorFinalHash
+        && request.resource.data.finalizadoGestorPor == resource.data.finalizadoGestorPor
+        && request.resource.data.finalizadoGestorEm == resource.data.finalizadoGestorEm
+        && request.resource.data.cienteFuncionarioPor == resource.data.cienteFuncionarioPor
+        && request.resource.data.cienteFuncionarioEm == resource.data.cienteFuncionarioEm
+        && request.resource.data.enviadoFuncionarioEm == resource.data.enviadoFuncionarioEm
+        && request.resource.data.revisadoGestorPor == request.auth.uid
+        && request.resource.data.status in ['rejeitada_gestor', 'em_revisao_gestor']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'motivoRejeicao',
+          'revisadoGestorPor',
+          'revisadoGestorEm',
+          'updatedAt'
+        ]);
+    }
+
+    function managerCanUploadFinalSignedFolha() {
+      return isManager()
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.mes == resource.data.mes
+        && request.resource.data.ano == resource.data.ano
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.emitidoPor == resource.data.emitidoPor
+        && request.resource.data.pdfOriginalPath == resource.data.pdfOriginalPath
+        && request.resource.data.pdfOriginalHash == resource.data.pdfOriginalHash
+        && request.resource.data.snapshotUsuario == resource.data.snapshotUsuario
+        && request.resource.data.snapshotResumo == resource.data.snapshotResumo
+        && request.resource.data.pdfFuncionarioAssinadoPath == resource.data.pdfFuncionarioAssinadoPath
+        && request.resource.data.pdfFuncionarioAssinadoHash == resource.data.pdfFuncionarioAssinadoHash
+        && request.resource.data.enviadoFuncionarioEm == resource.data.enviadoFuncionarioEm
+        && request.resource.data.revisadoGestorPor == resource.data.revisadoGestorPor
+        && request.resource.data.revisadoGestorEm == resource.data.revisadoGestorEm
+        && request.resource.data.cienteFuncionarioPor == resource.data.cienteFuncionarioPor
+        && request.resource.data.cienteFuncionarioEm == resource.data.cienteFuncionarioEm
+        && resource.data.status == 'em_revisao_gestor'
+        && request.resource.data.status == 'final_assinada_gestor'
+        && request.resource.data.finalizadoGestorPor == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'pdfGestorFinalPath',
+          'pdfGestorFinalHash',
+          'finalizadoGestorPor',
+          'finalizadoGestorEm',
+          'updatedAt'
+        ]);
+    }
+
+    function ownerCanConfirmFolhaCiencia() {
+      return isOwner(resource.data.userId)
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.mes == resource.data.mes
+        && request.resource.data.ano == resource.data.ano
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.emitidoPor == resource.data.emitidoPor
+        && request.resource.data.pdfOriginalPath == resource.data.pdfOriginalPath
+        && request.resource.data.pdfOriginalHash == resource.data.pdfOriginalHash
+        && request.resource.data.snapshotUsuario == resource.data.snapshotUsuario
+        && request.resource.data.snapshotResumo == resource.data.snapshotResumo
+        && request.resource.data.pdfFuncionarioAssinadoPath == resource.data.pdfFuncionarioAssinadoPath
+        && request.resource.data.pdfFuncionarioAssinadoHash == resource.data.pdfFuncionarioAssinadoHash
+        && request.resource.data.pdfGestorFinalPath == resource.data.pdfGestorFinalPath
+        && request.resource.data.pdfGestorFinalHash == resource.data.pdfGestorFinalHash
+        && request.resource.data.enviadoFuncionarioEm == resource.data.enviadoFuncionarioEm
+        && request.resource.data.revisadoGestorPor == resource.data.revisadoGestorPor
+        && request.resource.data.revisadoGestorEm == resource.data.revisadoGestorEm
+        && request.resource.data.finalizadoGestorPor == resource.data.finalizadoGestorPor
+        && request.resource.data.finalizadoGestorEm == resource.data.finalizadoGestorEm
+        && request.resource.data.motivoRejeicao == resource.data.motivoRejeicao
+        && resource.data.status == 'final_assinada_gestor'
+        && request.resource.data.status == 'concluida'
+        && request.resource.data.cienteFuncionarioPor == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'cienteFuncionarioPor',
+          'cienteFuncionarioEm',
+          'updatedAt'
+        ]);
     }
 
     function validLogAction() {
@@ -133,6 +413,28 @@ service cloud.firestore {
       allow read: if isOwner(userId) || isManager();
       allow create: if isManager() || ownerCanCreateOwnUserProfile(userId);
       allow update: if isManager() || ownerCanUpdateOwnUserProfile(userId);
+
+      match /messages/{messageId} {
+        allow read: if isOwner(userId) || isManager();
+        allow create: if isOwner(userId) || isManager();
+        allow update: if (isOwner(userId) || isManager())
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'type',
+            'title',
+            'body',
+            'metadata',
+            'createdAt',
+            'readAt'
+          ]);
+        allow delete: if isManager();
+      }
+    }
+
+    match /userDirectory/{userId} {
+      allow read: if isManager();
+      allow create: if isManager() || ownerCanCreateOwnUserDirectory(userId);
+      allow update: if isManager() || ownerCanWriteOwnUserDirectory(userId);
     }
 
     match /registrosFrequencia/{registroId} {
@@ -140,7 +442,19 @@ service cloud.firestore {
         || (resource != null && isOwner(resource.data.userId))
         || (resource == null && ownerCanReadOwnRegistroById(registroId));
       allow create: if isManager() || ownerCanCreateOwnRegistro();
-      allow update: if isManager() || ownerCanOnlyUpdateOwnJustification() || ownerCanUpdateOwnPunch();
+      allow update: if isManager() || ownerCanOnlyUpdateOwnJustification() || ownerCanUpdateOwnPunch() || ownerCanRespondToContestacao();
+    }
+
+    match /folhasFrequenciaMensal/{folhaId} {
+      allow read: if isManager()
+        || (resource != null && isOwner(resource.data.userId))
+        || (resource == null && ownerCanReadOwnFolhaById(folhaId));
+      allow create: if isManager() || ownerCanCreateOwnFolha();
+      allow update: if ownerCanReemitOwnFolha()
+        || ownerCanUploadSignedFolha()
+        || managerCanReviewFolha()
+        || managerCanUploadFinalSignedFolha()
+        || ownerCanConfirmFolhaCiencia();
     }
 
     match /logsAlteracao/{logId} {

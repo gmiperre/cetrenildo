@@ -1,4 +1,4 @@
-import { KeyboardTypeOptions, StyleSheet, Text, TextInput, TextInputAutoCapitalize, View } from 'react-native';
+import { KeyboardTypeOptions, StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
 
 import { theme } from '../utils/theme';
 
@@ -10,7 +10,7 @@ interface AppTextFieldProps {
   multiline?: boolean;
   placeholder?: string;
   keyboardType?: KeyboardTypeOptions;
-  autoCapitalize?: TextInputAutoCapitalize;
+  autoCapitalize?: TextInputProps['autoCapitalize'];
   autoCorrect?: boolean;
   maxLength?: number;
 }

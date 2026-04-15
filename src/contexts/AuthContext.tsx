@@ -17,6 +17,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  patchProfile: (patch: Partial<UserProfile>) => void;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
@@ -64,6 +65,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('✅ Push token atualizado');
         }
         await notificationService.schedulePunchReminder(nextProfile.horarioEntradaEsperado);
+        await notificationService.syncDailyReminderMessage(nextProfile.id);
+        await notificationService.notifyPendingAttendance(nextProfile.id);
         console.log('✅ Notificações configuradas');
       } catch (error) {
         console.warn('Falha ao configurar notificações do usuário autenticado.', error);
@@ -78,6 +81,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadRequestRef.current += 1;
     await loadProfile(firebaseUser, loadRequestRef.current);
   };
+
+  const patchProfile = useCallback((patch: Partial<UserProfile>) => {
+    setProfile((currentProfile) => (currentProfile ? { ...currentProfile, ...patch } : currentProfile));
+  }, []);
 
   useEffect(() => {
     console.log('🟢 AuthProvider montado - iniciando Firebase listener');
@@ -146,8 +153,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await authService.logout();
       },
       refreshProfile,
+      patchProfile,
     }),
-    [firebaseUser, loading, profile],
+    [firebaseUser, loading, patchProfile, profile],
   );
 
   if (loading) {

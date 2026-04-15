@@ -22,13 +22,13 @@ export function AppTabs() {
           backgroundColor: theme.colors.surface,
         },
         tabBarIcon: ({ color, size }) => {
-          const iconName = route.name === 'HomeTab' ? 'home-outline' : 'time-outline';
+          const iconName = route.name === 'Home' ? 'home-outline' : 'time-outline';
           return <Ionicons color={color} name={iconName} size={size} />;
         },
       })}
     >
-      <Tabs.Screen component={HomeScreen} name="HomeTab" options={{ title: 'Início' }} />
-      <Tabs.Screen component={FrequenciaNavigator} name="FrequenciaTab" options={{ title: 'Frequência' }} />
+      <Tabs.Screen component={HomeScreen} name="Home" options={{ title: 'Início' }} />
+      <Tabs.Screen component={FrequenciaNavigator} name="FrequenciaModule" options={{ title: 'Frequência' }} />
     </Tabs.Navigator>
   );
 }

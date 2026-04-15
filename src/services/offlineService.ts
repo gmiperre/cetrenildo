@@ -1,12 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Timestamp } from 'firebase/firestore';
 
-import { FrequenciaRegistro, OfflineAction } from '../models/frequencia';
+import { FolhaFrequenciaMensal, FrequenciaRegistro, OfflineAction } from '../models/frequencia';
 
 const OFFLINE_ACTIONS_KEY = '@equipe-cetreina/offline-actions';
 const TIMESTAMP_TAG = '__firestoreTimestamp';
 
 const cacheKey = (userId: string) => `@equipe-cetreina/cache/${userId}`;
+const folhasCacheKey = (userId: string) => `@equipe-cetreina/cache/folhas/${userId}`;
 
 const encodeTimestamps = (value: unknown): unknown => {
   if (value instanceof Timestamp) {
@@ -83,5 +84,27 @@ export const offlineService = {
     const nextRecords = records.filter((item) => item.data !== record.data);
     nextRecords.push(record);
     await this.setCachedRecords(record.userId, nextRecords);
+  },
+
+  async getCachedFolhas(userId: string) {
+    return readJson<FolhaFrequenciaMensal[]>(folhasCacheKey(userId), []);
+  },
+
+  async setCachedFolhas(userId: string, folhas: FolhaFrequenciaMensal[]) {
+    await AsyncStorage.setItem(folhasCacheKey(userId), serializeJson(folhas));
+  },
+
+  async upsertCachedFolha(folha: FolhaFrequenciaMensal) {
+    const folhas = await this.getCachedFolhas(folha.userId);
+    const current = folhas.find((item) => item.userId === folha.userId && item.mes === folha.mes && item.ano === folha.ano);
+    const shouldReplace = !current || (folha.updatedAt?.toMillis?.() ?? 0) >= (current.updatedAt?.toMillis?.() ?? 0);
+
+    if (!shouldReplace) {
+      return;
+    }
+
+    const next = folhas.filter((item) => !(item.userId === folha.userId && item.mes === folha.mes && item.ano === folha.ano));
+    next.push(folha);
+    await this.setCachedFolhas(folha.userId, next);
   },
 };

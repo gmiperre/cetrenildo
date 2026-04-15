@@ -58,11 +58,13 @@ export function useMonthlySummary(userId?: string) {
   }, [refresh]);
 
   const workedDays = records.filter((record) => record.status === 'presente' || record.status === 'abono').length;
+  const justifiedDays = records.filter((record) => record.status === 'falta_justificada').length;
 
   return {
     loading,
     workedDays,
-    missedDays: Math.max(expectedDays - workedDays, 0),
+    justifiedDays,
+    missedDays: Math.max(expectedDays - workedDays - justifiedDays, 0),
     records,
     refresh,
   };

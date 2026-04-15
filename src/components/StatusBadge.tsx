@@ -7,21 +7,24 @@ import { theme } from '../utils/theme';
 interface StatusBadgeProps {
   status: RegistroStatus;
   pending?: boolean;
+  labelOverride?: string;
 }
 
 const labelMap: Record<RegistroStatus, string> = {
   presente: 'Presente',
   falta: 'Falta',
+  falta_justificada: 'Falta justificada',
   abono: 'Abono',
+  presenca_contestada: 'Presença contestada',
 };
 
-export function StatusBadge({ status, pending = false }: StatusBadgeProps) {
+export function StatusBadge({ status, pending = false, labelOverride }: StatusBadgeProps) {
   const color = getStatusColor(status, pending);
 
   return (
     <View style={[styles.badge, { backgroundColor: `${color}18`, borderColor: `${color}60` }]}>
       <View style={[styles.dot, { backgroundColor: color }]} />
-      <Text style={[styles.label, { color }]}>{pending ? 'Pendente' : labelMap[status]}</Text>
+      <Text style={[styles.label, { color }]}>{pending ? 'Pendente' : (labelOverride ?? labelMap[status])}</Text>
     </View>
   );
 }

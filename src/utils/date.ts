@@ -39,6 +39,20 @@ export const formatTime = (value?: Timestamp | Date | null) => {
 
 export const isWeekday = (date: Date) => date.getDay() !== 0 && date.getDay() !== 6;
 
+/**
+ * Retorna se a data exige frequência.
+ * - Dia útil sem política de calendário: exige.
+ * - Fim de semana sem política: NÃO exige.
+ * - Qualquer dia COM política: respeita o campo `requerPonto` da política.
+ */
+export const isWorkdayForDate = (dateKey: string, dayPolicy: CalendarDay | null): boolean => {
+  if (dayPolicy !== null) {
+    return dayPolicy.requerPonto;
+  }
+
+  return isWeekday(parseDateKey(dateKey));
+};
+
 export const getMonthDateRange = (month: number, year: number) => {
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 0);
@@ -72,8 +86,16 @@ export const getStatusColor = (status: FrequenciaRegistro['status'], pending = f
     return '#218A5A';
   }
 
+  if (status === 'falta_justificada') {
+    return '#B7791F';
+  }
+
   if (status === 'abono') {
     return '#2A6F97';
+  }
+
+  if (status === 'presenca_contestada') {
+    return '#7C3AED';
   }
 
   return '#C44536';
@@ -109,6 +131,16 @@ export const buildSyntheticRecord = (userId: string, date: string, status: Frequ
       userId: null,
       timestamp: null,
     },
+    contestacaoStatus: 'sem_contestacao',
+    contestacaoCiclo: 0,
+    contestacaoMotivo: null,
+    contestacaoRespostaFuncionario: null,
+    contestacaoDecisao: null,
+    contestacaoDecididoPor: null,
+    contestacaoDecididaEm: null,
+    contestacaoReaberturaMotivo: null,
+    contestacaoReabertaPor: null,
+    contestacaoReabertaEm: null,
     editadoPor: null,
     editadoEm: null,
     criadoEm: now,
