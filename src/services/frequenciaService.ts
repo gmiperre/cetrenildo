@@ -876,17 +876,22 @@ async function emitFolhaMensalRemote(userId: string, month: number, year: number
   const resumo = buildFolhaResumo(records);
   const now = Timestamp.now();
   const id = makeFolhaId(userId, month, year);
+  const calendarPolicies = await calendarService.getMonthlyPolicies(month, year);
   const localPdfUri = await folhaPdfService.generateFolhaMensalPdf({
     usuario: {
       nome: profile.nome,
       email: profile.email,
       horarioEntradaEsperado: profile.horarioEntradaEsperado,
       horarioSaidaEsperado: profile.horarioSaidaEsperado,
+      matricula: ((profile as unknown) as Record<string, unknown>).matricula as string | null ?? null,
+      cargo: ((profile as unknown) as Record<string, unknown>).cargo as string | null ?? null,
+      cargaHoraria: ((profile as unknown) as Record<string, unknown>).cargaHoraria as string | null ?? null,
     },
     month,
     year,
     registros: records,
     resumo,
+    calendarPolicies,
   });
   const uploadedOriginal = await folhaDocumentService.uploadFolhaOriginalEmitida({
     userId,
@@ -896,6 +901,7 @@ async function emitFolhaMensalRemote(userId: string, month: number, year: number
     mimeType: 'application/pdf',
     fileUri: localPdfUri,
   });
+  await folhaDocumentService.createDownloadUrl(uploadedOriginal.path, 60);
   const pdfOriginalPath = uploadedOriginal.path;
   const pdfOriginalHash = uploadedOriginal.hash;
 

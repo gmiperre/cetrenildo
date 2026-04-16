@@ -1,5 +1,8 @@
-import * as Print from 'expo-print';
+import { Asset } from 'expo-asset';
+import * as FileSystem from 'expo-file-system/legacy';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
+import { CalendarDay } from '../models/calendar';
 import { FrequenciaRegistro } from '../models/frequencia';
 
 type FolhaPdfInput = {
@@ -8,6 +11,9 @@ type FolhaPdfInput = {
     email: string;
     horarioEntradaEsperado: string;
     horarioSaidaEsperado: string;
+    matricula?: string | null;
+    cargo?: string | null;
+    cargaHoraria?: string | null;
   };
   month: number;
   year: number;
@@ -20,205 +26,221 @@ type FolhaPdfInput = {
     abonos: number;
     presencasContestadas: number;
   };
+  calendarPolicies?: Record<string, CalendarDay>;
 };
 
-const monthFormatter = new Intl.DateTimeFormat('pt-BR', {
-  month: 'long',
-  year: 'numeric',
-});
+const templateAsset = Asset.fromModule(require('../../modelo_frequencia.pdf'));
 
-const escapeHtml = (value: string) =>
-  value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+const MONTH_NAMES_PT = [
+  'JANEIRO',
+  'FEVEREIRO',
+  'MARCO',
+  'ABRIL',
+  'MAIO',
+  'JUNHO',
+  'JULHO',
+  'AGOSTO',
+  'SETEMBRO',
+  'OUTUBRO',
+  'NOVEMBRO',
+  'DEZEMBRO',
+];
 
-const formatMonthLabel = (month: number, year: number) =>
-  monthFormatter.format(new Date(year, month - 1, 1)).replace(/^./, (char) => char.toUpperCase());
+const LEFT_START_COL_X = 96.6;
+const LEFT_END_COL_X = 205.2;
+const LEFT_RUBRIC_COL_X = 286.0;
 
-const formatTime = (date: FrequenciaRegistro['horaEntrada'] | FrequenciaRegistro['horaSaida']) => {
-  if (!date) {
+const RIGHT_START_COL_X = 358.8;
+const RIGHT_END_COL_X = 472.2;
+const RIGHT_RUBRIC_COL_X = 551.0;
+
+const DAILY_TOP = 411.66;
+const DAILY_ROW_HEIGHT = 19.44;
+
+const OCORRENCIAS_TOP = 601;
+const OCORRENCIAS_ROW_HEIGHT = 11.2;
+const OCORRENCIAS_MAX_ROWS = 31;
+
+const readTemplateBase64 = async () => {
+  if (!templateAsset.localUri) {
+    await templateAsset.downloadAsync();
+  }
+
+  const uri = templateAsset.localUri ?? templateAsset.uri;
+  return FileSystem.readAsStringAsync(uri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+};
+
+const safeValue = (value: string | null | undefined) => {
+  const normalized = value?.trim();
+  return normalized && normalized.length > 0 ? normalized : '-';
+};
+
+const parseMatricula = (matricula: string | null | undefined) => {
+  const digits = (matricula ?? '').replace(/\D/g, '');
+  if (!digits) {
+    return { numero: '-', dv: '-' };
+  }
+
+  if (digits.length <= 2) {
+    return { numero: digits, dv: '-' };
+  }
+
+  return {
+    numero: digits.slice(0, -2),
+    dv: digits.slice(-2),
+  };
+};
+
+const formatTime = (value: FrequenciaRegistro['horaEntrada'] | FrequenciaRegistro['horaSaida']) => {
+  if (!value) {
     return '';
   }
 
-  return date.toDate().toLocaleTimeString('pt-BR', {
+  return value.toDate().toLocaleTimeString('pt-BR', {
     hour: '2-digit',
     minute: '2-digit',
   });
 };
 
-const buildRows = (records: FrequenciaRegistro[]) => {
-  const byDay = new Map<number, FrequenciaRegistro>();
-  records.forEach((record) => {
-    const [, , dayRaw] = record.data.split('-');
-    const day = Number(dayRaw);
-    if (!Number.isNaN(day) && day >= 1 && day <= 31) {
-      byDay.set(day, record);
-    }
-  });
-
-  return Array.from({ length: 31 }, (_, index) => {
-    const day = index + 1;
-    const record = byDay.get(day);
-    return {
-      day,
-      entrada: formatTime(record?.horaEntrada ?? null),
-      saida: formatTime(record?.horaSaida ?? null),
-      status: record?.status ?? '',
-    };
-  });
-};
-
-const buildHtml = (input: FolhaPdfInput) => {
-  const rows = buildRows(input.registros)
-    .map(
-      (row) => `
-        <tr>
-          <td>${String(row.day).padStart(2, '0')}</td>
-          <td>${escapeHtml(row.entrada)}</td>
-          <td>${escapeHtml(row.saida)}</td>
-          <td>${escapeHtml(row.status)}</td>
-          <td></td>
-        </tr>`,
-    )
-    .join('');
-
-  return `
-    <html>
-      <head>
-        <meta charset="utf-8" />
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            font-size: 11px;
-            color: #1f2937;
-            padding: 20px;
-          }
-          h1 {
-            font-size: 18px;
-            margin: 0 0 4px 0;
-            text-align: center;
-          }
-          .subtitle {
-            text-align: center;
-            margin-bottom: 16px;
-          }
-          .meta {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 14px;
-          }
-          .meta td {
-            border: 1px solid #111827;
-            padding: 6px;
-            vertical-align: top;
-          }
-          .meta-label {
-            font-weight: bold;
-            width: 24%;
-          }
-          table.grid {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 14px;
-          }
-          table.grid th,
-          table.grid td {
-            border: 1px solid #111827;
-            padding: 4px;
-            text-align: center;
-          }
-          table.grid th {
-            background: #f3f4f6;
-          }
-          .summary {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-          }
-          .summary td {
-            border: 1px solid #111827;
-            padding: 6px;
-          }
-          .signatures {
-            width: 100%;
-            margin-top: 28px;
-          }
-          .signature-row {
-            width: 100%;
-            display: flex;
-            gap: 24px;
-            justify-content: space-between;
-          }
-          .signature-box {
-            flex: 1;
-            text-align: center;
-            border-top: 1px solid #111827;
-            padding-top: 6px;
-          }
-        </style>
-      </head>
-      <body>
-        <h1>Folha de Frequência Mensal</h1>
-        <div class="subtitle">${escapeHtml(formatMonthLabel(input.month, input.year))}</div>
-
-        <table class="meta">
-          <tr>
-            <td class="meta-label">Servidor</td>
-            <td>${escapeHtml(input.usuario.nome)}</td>
-            <td class="meta-label">E-mail</td>
-            <td>${escapeHtml(input.usuario.email)}</td>
-          </tr>
-          <tr>
-            <td class="meta-label">Jornada esperada</td>
-            <td>${escapeHtml(input.usuario.horarioEntradaEsperado)} às ${escapeHtml(input.usuario.horarioSaidaEsperado)}</td>
-            <td class="meta-label">Período</td>
-            <td>${String(input.month).padStart(2, '0')}/${input.year}</td>
-          </tr>
-        </table>
-
-        <table class="grid">
-          <thead>
-            <tr>
-              <th>Dia</th>
-              <th>Entrada</th>
-              <th>Saída</th>
-              <th>Status</th>
-              <th>Rubrica</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows}
-          </tbody>
-        </table>
-
-        <table class="summary">
-          <tr>
-            <td>Dias com registro: ${input.resumo.diasComRegistro}</td>
-            <td>Presenças: ${input.resumo.presentes}</td>
-            <td>Faltas: ${input.resumo.faltas}</td>
-          </tr>
-          <tr>
-            <td>Faltas justificadas: ${input.resumo.faltasJustificadas}</td>
-            <td>Abonos: ${input.resumo.abonos}</td>
-            <td>Presenças contestadas: ${input.resumo.presencasContestadas}</td>
-          </tr>
-        </table>
-
-        <div class="signature-row">
-          <div class="signature-box">Assinatura do funcionário</div>
-          <div class="signature-box">Assinatura da chefia</div>
-        </div>
-      </body>
-    </html>`;
-};
+const toDateKey = (year: number, month: number, day: number) =>
+  `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
 export const folhaPdfService = {
   async generateFolhaMensalPdf(input: FolhaPdfInput) {
-    const html = buildHtml(input);
-    const result = await Print.printToFileAsync({ html, base64: false });
-    return result.uri;
+    const templateBase64 = await readTemplateBase64();
+    const pdfDoc = await PDFDocument.load(templateBase64);
+    const page = pdfDoc.getPage(0);
+
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+    const { width, height } = page.getSize();
+    const yFromTop = (top: number, fontSize: number) => height - top - fontSize;
+
+    const drawText = (
+      text: string,
+      x: number,
+      top: number,
+      fontSize = 8,
+      isBold = false,
+    ) => {
+      page.drawText(text, {
+        x,
+        y: yFromTop(top, fontSize),
+        size: fontSize,
+        font: isBold ? boldFont : font,
+        color: rgb(0, 0, 0),
+      });
+    };
+
+    const drawCentered = (
+      text: string,
+      leftX: number,
+      rightX: number,
+      top: number,
+      fontSize = 8,
+      isBold = false,
+    ) => {
+      const useFont = isBold ? boldFont : font;
+      const textWidth = useFont.widthOfTextAtSize(text, fontSize);
+      const x = leftX + Math.max(0, (rightX - leftX - textWidth) / 2);
+      drawText(text, x, top, fontSize, isBold);
+    };
+
+    const nomeMes = MONTH_NAMES_PT[input.month - 1] ?? '-';
+    const matricula = parseMatricula(input.usuario.matricula);
+
+    drawText(nomeMes, 274.08, 198.8, 12, true);
+    drawText(String(input.year), 360.0, 198.8, 12, true);
+
+    drawText('PRO-REITORIA DE GRADUACAO / DEPARTAMENTO DE ESTAGIOS E BOLSAS', 36.48, 227.22, 8);
+    drawText(safeValue(input.usuario.nome), 36.48, 248.94, 8);
+    drawText(matricula.numero, 451.44, 248.94, 8);
+    drawText(matricula.dv, 517.08, 248.94, 8);
+    drawText(safeValue(input.usuario.cargo), 36.48, 271.02, 8);
+
+    drawText('PR-1/CETREINA', 36.48, 294.42, 8);
+    drawText('X', 342.0, 294.0, 9, true);
+    drawText(`${safeValue(input.usuario.horarioEntradaEsperado)} as ${safeValue(input.usuario.horarioSaidaEsperado)}`, 451.44, 271.02, 8);
+    drawText(safeValue(input.usuario.cargaHoraria), 451.44, 294.42, 8);
+
+    const recordsByDay = new Map<number, FrequenciaRegistro>();
+    input.registros.forEach((record) => {
+      const day = Number(record.data.split('-')[2]);
+      if (!Number.isNaN(day) && day >= 1 && day <= 31) {
+        recordsByDay.set(day, record);
+      }
+    });
+
+    const lastDayOfMonth = new Date(input.year, input.month, 0).getDate();
+
+    const drawDailyCell = (day: number, rowTop: number, isRight: boolean) => {
+      if (day > lastDayOfMonth) {
+        return;
+      }
+
+      const key = toDateKey(input.year, input.month, day);
+      const policy = input.calendarPolicies?.[key];
+      const weekday = new Date(input.year, input.month - 1, day).getDay();
+      const isNonWork = weekday === 0 || weekday === 6 || policy?.tipo === 'feriado' || policy?.tipo === 'ponto_facultativo' || policy?.tipo === 'sem_expediente';
+      const record = recordsByDay.get(day);
+
+      const startX = isRight ? RIGHT_START_COL_X : LEFT_START_COL_X;
+      const endX = isRight ? RIGHT_END_COL_X : LEFT_END_COL_X;
+      const rubricX = isRight ? RIGHT_RUBRIC_COL_X : LEFT_RUBRIC_COL_X;
+
+      if (isNonWork) {
+        return;
+      }
+
+      if (!record) {
+        return;
+      }
+
+      if (record.status === 'presente') {
+        const entrada = formatTime(record.horaEntrada);
+        const saida = formatTime(record.horaSaida);
+        drawText(entrada, startX, rowTop, 8);
+        drawText(saida, endX, rowTop, 8);
+      } else {
+        drawCentered('---', startX, endX, rowTop, 8, true);
+        drawCentered('---', endX, rubricX, rowTop, 8, true);
+      }
+    };
+
+    for (let row = 0; row < 16; row += 1) {
+      const rowTop = DAILY_TOP + row * DAILY_ROW_HEIGHT;
+      const leftDay = row + 1;
+      const rightDay = row + 17;
+
+      drawDailyCell(leftDay, rowTop, false);
+      drawDailyCell(rightDay, rowTop, true);
+    }
+
+    const ocorrencias = input.registros
+      .filter((r) => !!r.justificativaTexto?.trim())
+      .sort((a, b) => a.data.localeCompare(b.data))
+      .slice(0, OCORRENCIAS_MAX_ROWS);
+
+    ocorrencias.forEach((record, idx) => {
+      const rowTop = OCORRENCIAS_TOP + idx * OCORRENCIAS_ROW_HEIGHT;
+      const day = Number(record.data.split('-')[2]);
+      drawCentered(String(day).padStart(2, '0'), 38, 86, rowTop, 7.2, true);
+
+      const raw = record.justificativaTexto?.trim() ?? '';
+      const descricao = raw.length > 120 ? `${raw.slice(0, 117)}...` : raw;
+      drawText(descricao, 96, rowTop, 7.1);
+    });
+
+    const outputBase64 = await pdfDoc.saveAsBase64({ dataUri: false });
+    const outputUri = `${FileSystem.cacheDirectory}folha-frequencia-${input.year}-${String(input.month).padStart(2, '0')}-${Date.now()}.pdf`;
+
+    await FileSystem.writeAsStringAsync(outputUri, outputBase64, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+
+    return outputUri;
   },
 };

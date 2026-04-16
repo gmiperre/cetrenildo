@@ -116,7 +116,33 @@ export function HistoricoScreen({ navigation }: Props) {
       const url = await folhaDocumentService.createDownloadUrl(path);
       await Linking.openURL(url);
     } catch (err) {
-      Alert.alert('Falha ao abrir arquivo', `${err}`.replace('Error: ', ''));
+      const message = `${err}`.replace('Error: ', '');
+      const objectMissing = message.toLowerCase().includes('object not found');
+
+      if (objectMissing) {
+        Alert.alert(
+          'Arquivo não encontrado',
+          'A folha salva para este mês aponta para um arquivo que não existe mais no storage. Reemita a folha para gerar um PDF novo.',
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+              text: 'Reemitir agora',
+              onPress: () => {
+                emitirFolha(month, year)
+                  .then(() => refreshFolha(month, year))
+                  .then(() => {
+                    Alert.alert('Folha reemitida', 'Um novo PDF foi gerado. Tente baixar novamente.');
+                  })
+                  .catch((emitError) => {
+                    Alert.alert('Falha ao reemitir', `${emitError}`.replace('Error: ', ''));
+                  });
+              },
+            },
+          ],
+        );
+      } else {
+        Alert.alert('Falha ao abrir arquivo', message);
+      }
     } finally {
       setOpeningFolha(false);
     }

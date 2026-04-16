@@ -35,12 +35,14 @@ const fnv1aHash = (value: Uint8Array) => {
   return (hash >>> 0).toString(16).padStart(8, '0');
 };
 
+const folhaStorageBasePath = 'ausencias/folhas';
+
 export const folhaDocumentService = {
   async uploadFolhaOriginalEmitida(input: UploadFolhaPdfInput) {
     const supabase = getSupabaseClient();
     const normalizedMonth = `${input.month}`.padStart(2, '0');
     const normalizedName = sanitizeFileName(input.fileName || 'folha-frequencia.pdf') || 'folha-frequencia.pdf';
-    const path = `folhas/original/${input.userId}/${input.year}-${normalizedMonth}/${Date.now()}-${normalizedName}`;
+    const path = `${folhaStorageBasePath}/original/${input.userId}/${input.year}-${normalizedMonth}/${Date.now()}-${normalizedName}`;
 
     const buffer = await toArrayBuffer(input.fileUri);
     const bytes = new Uint8Array(buffer);
@@ -67,7 +69,7 @@ export const folhaDocumentService = {
     const supabase = getSupabaseClient();
     const normalizedMonth = `${input.month}`.padStart(2, '0');
     const normalizedName = sanitizeFileName(input.fileName || 'folha-assinada.pdf') || 'folha-assinada.pdf';
-    const path = `folhas/funcionario-assinada/${input.userId}/${input.year}-${normalizedMonth}/${Date.now()}-${normalizedName}`;
+    const path = `${folhaStorageBasePath}/funcionario-assinada/${input.userId}/${input.year}-${normalizedMonth}/${Date.now()}-${normalizedName}`;
 
     const buffer = await toArrayBuffer(input.fileUri);
     const bytes = new Uint8Array(buffer);
@@ -94,7 +96,7 @@ export const folhaDocumentService = {
     const supabase = getSupabaseClient();
     const normalizedMonth = `${input.month}`.padStart(2, '0');
     const normalizedName = sanitizeFileName(input.fileName || 'folha-final-assinada.pdf') || 'folha-final-assinada.pdf';
-    const path = `folhas/gestor-final/${input.userId}/${input.year}-${normalizedMonth}/${Date.now()}-${normalizedName}`;
+    const path = `${folhaStorageBasePath}/gestor-final/${input.userId}/${input.year}-${normalizedMonth}/${Date.now()}-${normalizedName}`;
 
     const buffer = await toArrayBuffer(input.fileUri);
     const bytes = new Uint8Array(buffer);
