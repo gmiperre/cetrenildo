@@ -4,6 +4,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppButton } from '../../components/AppButton';
 import { ScreenShell } from '../../components/ScreenShell';
 import { useAuth } from '../../hooks/useAuth';
+import { getTodayKey } from '../../utils/date';
 import { theme } from '../../utils/theme';
 import { AppStackParamList } from '../../navigation/types';
 
@@ -26,7 +27,15 @@ export function ModulosScreen({ navigation }: Props) {
         <Text style={styles.moduleText}>
           Registre ponto, acompanhe o histórico mensal, envie justificativas e trate ocorrências do dia.
         </Text>
-        <AppButton onPress={() => navigation.navigate('FrequenciaModule')} title="Abrir frequência" />
+        <AppButton
+          onPress={() =>
+            navigation.navigate('FrequenciaModule', {
+              screen: 'Registro',
+              params: { date: getTodayKey() },
+            })
+          }
+          title="Abrir frequência"
+        />
       </View>
 
       <View style={styles.moduleCard}>
