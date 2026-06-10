@@ -4,7 +4,7 @@ Aplicativo mobile em React Native com Expo e backend Firebase para apoiar rotina
 
 Documentacao complementar:
 
-- veja `HISTORICO_DESENVOLVIMENTO.md` para o registro cronologico das decisoes e implementacoes desta evolucao
+- veja `cronograma.md` para o registro cronologico das decisoes e implementacoes desta evolucao
 - veja `CHANGELOG.md` para um resumo formal das mudancas por categoria
 
 Status atual:
