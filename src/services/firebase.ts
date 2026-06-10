@@ -18,7 +18,11 @@ const fallbackConfig: ExpoFirebaseConfig = {
   appId: 'YOUR_APP_ID',
 };
 
-const config = (Constants.expoConfig?.extra?.firebase ?? fallbackConfig) as ExpoFirebaseConfig;
+const config = (
+  Constants.expoConfig?.extra?.firebaseConfig
+  ?? Constants.expoConfig?.extra?.firebase
+  ?? fallbackConfig
+) as ExpoFirebaseConfig;
 
 export const isFirebaseConfigured = !Object.values(config).some((value) => !value || `${value}`.startsWith('YOUR_'));
 

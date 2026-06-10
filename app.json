@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Equipe Cetreina",
-    "slug": "equipe-cetreina",
+    "name": "Cetreinildo",
+    "slug": "cetreinildo",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,7 +13,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.equipecetreina.app"
+      "bundleIdentifier": "com.cetreinildo.app"
     },
     "android": {
       "package": "com.equipecetreina.app",
@@ -39,11 +39,11 @@
       ]
     ],
     "extra": {
-      "firebase": {
+      "firebaseConfig": {
         "apiKey": "AIzaSyDUwmHXRMjx64MQPaIjW2oALiPJdgKfElI",
         "authDomain": "equipe-cetreina.firebaseapp.com",
         "projectId": "equipe-cetreina",
-        "storageBucket": "equipe-cetreina.appspot.com",
+        "storageBucket": "equipe-cetreina.firebasestorage.app",
         "messagingSenderId": "979712783428",
         "appId": "1:979712783428:web:a05dc8c54ac0511d58b811"
       },
